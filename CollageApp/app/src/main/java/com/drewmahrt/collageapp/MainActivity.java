@@ -101,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
         final DrawingView dv= new DrawingView(this);
         dv.setDrawingCacheEnabled(true);
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        params.addRule(RelativeLayout.ABOVE,R.id.toolbar_bottom);
+        params.addRule(RelativeLayout.ABOVE, R.id.toolbar_bottom);
         rl.addView(dv, params);
 
         //Fix to bring FAB on top for 4.x devices
@@ -113,17 +113,14 @@ public class MainActivity extends AppCompatActivity {
                 Bitmap bitmap = dv.getDrawingCache();
 
                 //  Get path to new gallery image
-                Uri path = getApplicationContext().getContentResolver().insert (MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
-                try
-                {
-                    OutputStream stream = getApplicationContext().getContentResolver().openOutputStream (path);
-                    bitmap.compress (Bitmap.CompressFormat.JPEG, 90, stream);
-                    Toast.makeText(getApplicationContext(),"Image saved!",Toast.LENGTH_LONG).show();
+                Uri path = getApplicationContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+                try {
+                    OutputStream stream = getApplicationContext().getContentResolver().openOutputStream(path);
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream);
+                    Toast.makeText(getApplicationContext(), "Image saved!", Toast.LENGTH_LONG).show();
                     finish();
-                }
-                catch (FileNotFoundException e)
-                {
-                    Log.e (TAG, "E: " + e.getMessage ());
+                } catch (FileNotFoundException e) {
+                    Log.e(TAG, "E: " + e.getMessage());
                 }
                 return true;
             }
@@ -223,6 +220,22 @@ public class MainActivity extends AppCompatActivity {
                             invalidate();
                         }
                     });
+                    return true;
+                }
+            });
+
+            zoomOutButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    zoom("out");
+                    return true;
+                }
+            });
+
+            zoomInButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    zoom("in");
                     return true;
                 }
             });
@@ -441,6 +454,29 @@ public class MainActivity extends AppCompatActivity {
                 }
                 return true;
             }
+        }
+
+        private void zoom(String zoomChoice) {
+
+                if(zoomChoice.equals("in"))
+                    mScaleFactor = 1.05f;
+                else
+                    mScaleFactor = 0.95f;
+
+                int imageIndex = getImageIndex();
+                if (imageIndex >= 0) {
+                    Log.d(TAG,"mScaleFactor: "+mScaleFactor);
+                    Bitmap originalBitmap = imageList.get(imageIndex).originalBitmap;
+                    Bitmap resizedBitmap = imageList.get(imageIndex).resizedBitmap;
+                    int newHeight = (int) (resizedBitmap.getHeight() * mScaleFactor);
+                    int newWidth = (int) (resizedBitmap.getWidth() * mScaleFactor);
+                    if (newHeight > 100 && newWidth > 100 && newHeight < screenHeight && newWidth < screenWidth) {
+                        imageList.get(imageIndex).resizedBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, false);
+                        imageList.get(imageIndex).xEdge = imageList.get(imageIndex).x + imageList.get(imageIndex).resizedBitmap.getWidth();
+                        imageList.get(imageIndex).yEdge = imageList.get(imageIndex).y + imageList.get(imageIndex).resizedBitmap.getHeight();
+                        invalidate();
+                    }
+                }
         }
 
         @Override
