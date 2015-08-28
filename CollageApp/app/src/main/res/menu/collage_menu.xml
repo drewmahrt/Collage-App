@@ -1,0 +1,36 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto" >
+    <item android:id="@+id/close_image_action"
+        android:title="@string/close_action_title"
+        android:icon="@drawable/ic_clear"
+        app:showAsAction="always"
+        />
+
+    <item android:id="@+id/save_action"
+        android:title="@string/save_action_title"
+        android:icon="@drawable/ic_save"
+        app:showAsAction="always"
+        />
+    <item android:id="@+id/sort_layers_action"
+        android:title="@string/sort_layers_action_title"
+        android:icon="@drawable/ic_sort"
+        app:showAsAction="always"
+        />
+    <item android:id="@+id/pick_color_action"
+        android:title="@string/pick_color_action_title"
+        android:icon="@drawable/ic_color_picker"
+        app:showAsAction="always"
+        />
+
+    <item android:id="@+id/zoom_out_action"
+        android:title="@string/zoom_out_action_title"
+        android:icon="@drawable/ic_zoom_out"
+        app:showAsAction="always"
+        />
+
+    <item android:id="@+id/zoom_in_action"
+        android:title="@string/zoom_in_action_title"
+        android:icon="@drawable/ic_zoom_in"
+        app:showAsAction="always"
+        />
+</menu>
