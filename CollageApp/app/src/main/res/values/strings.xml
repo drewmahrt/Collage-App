@@ -13,4 +13,6 @@
     <string name="materialcolorpicker__errHex" >Hex Code Format incorrect</string>
     <string name="materialcolorpicker__inputColor">Color: </string>
     <string name="materialcolorpicker__btnSelectColor">Select</string>
+    <string name="sort_layers_down_action_title">Move Down</string>
+    <string name="sort_layers_up_action_title">Move Up</string>
 </resources>

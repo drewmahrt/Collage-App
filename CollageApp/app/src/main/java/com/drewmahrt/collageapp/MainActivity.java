@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "CollageActivity";
     private static final int PICTURE_GALLERY = 1;
     private FloatingActionButton addFab;
-    private MenuItem closeButton, saveButton, sortButton, colorButton, zoomOutButton, zoomInButton;
+    private MenuItem closeButton, saveButton, sortUpButton, sortDownButton, colorButton, zoomOutButton, zoomInButton;
 
 
     @Override
@@ -63,7 +63,8 @@ public class MainActivity extends AppCompatActivity {
         closeButton = bottomMenu.findItem(R.id.close_image_action);
         Log.d("BUTTONTEST","Close button: "+closeButton.getTitle());
         saveButton = bottomMenu.findItem(R.id.save_action);
-        sortButton = bottomMenu.findItem(R.id.sort_layers_action);
+        sortUpButton = bottomMenu.findItem(R.id.sort_layer_up_action);
+        sortDownButton = bottomMenu.findItem(R.id.sort_layer_down_action);
         colorButton = bottomMenu.findItem(R.id.pick_color_action);
         zoomOutButton = bottomMenu.findItem(R.id.zoom_out_action);
         zoomInButton = bottomMenu.findItem(R.id.zoom_in_action);
@@ -158,11 +159,13 @@ public class MainActivity extends AppCompatActivity {
         private ColorPicker cp;
 
         public class ImageObject{
+            private static final String TAG = "CollageActivity.IO";
             public float x, y, xEdge, yEdge;
             public Bitmap originalBitmap;
             public Bitmap resizedBitmap;
 
             public ImageObject(Bitmap orig,Bitmap resized){
+                Log.d(TAG,"lastSelected: "+imageList.size());
                 x = screenWidth*0.4f;
                 y = screenHeight*0.4f;
                 xEdge = x+resized.getWidth();
@@ -239,6 +242,36 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 }
             });
+
+            sortDownButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    Log.d(TAG,"Sort down with "+lastSelected);
+                    if(lastSelected > 0){
+                        ImageObject temp = imageList.remove(lastSelected);
+                        imageList.add(lastSelected-1,temp);
+                        Log.d(TAG, "Down: Moving from " + lastSelected + " to " + (lastSelected - 1));
+                        lastSelected--;
+                        invalidate();
+                    }
+                    return true;
+                }
+            });
+
+            sortUpButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    Log.d(TAG,"Sort up with "+lastSelected);
+                    if(lastSelected >= 0 && lastSelected < imageList.size()-1){
+                        ImageObject temp = imageList.remove(lastSelected);
+                        imageList.add(lastSelected+1,temp);
+                        Log.d(TAG, "Up: Moving from " + lastSelected + " to " + (lastSelected + 1));
+                        lastSelected++;
+                        invalidate();
+                    }
+                    return true;
+                }
+            });
         }
 
 
@@ -266,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
 
                         String selectedImagePath = getPath(selectedImageUri);
 
-                        Log.d(TAG,"path: "+selectedImagePath);
+                        Log.d(TAG, "path: " + selectedImagePath);
 
                         final BitmapFactory.Options options = new BitmapFactory.Options();
                         options.inJustDecodeBounds = true;
@@ -278,7 +311,8 @@ public class MainActivity extends AppCompatActivity {
 
 
                         Bitmap bitmap = BitmapFactory.decodeFile(selectedImagePath, options);
-                        imageList.add(new ImageObject(bitmap,resizeImageForImageView(BitmapFactory.decodeFile(selectedImagePath, options), (int)(bitmap.getWidth()*0.4), (int)(bitmap.getHeight()*0.4))));
+                        imageList.add(new ImageObject(bitmap, resizeImageForImageView(BitmapFactory.decodeFile(selectedImagePath, options), (int) (bitmap.getWidth() * 0.4), (int) (bitmap.getHeight() * 0.4))));
+                        lastSelected = imageList.size()-1;
 
                         getWindow().getDecorView().setSystemUiVisibility(
                                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -359,13 +393,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public int getImageIndex(){
-            if(lastSelected != -1)
-                return lastSelected;
             int currIndex = -1;
             for (ImageObject img:imageList) {
                 if(currX >= img.x && currX <= img.xEdge && currY >= img.y && currY <= img.yEdge)
                     currIndex = imageList.indexOf(img);
             }
+            Log.d(TAG,"getImageIndex lastSelected: "+currIndex);
             lastSelected = currIndex;
             return currIndex;
         }
@@ -415,7 +448,6 @@ public class MainActivity extends AppCompatActivity {
                         imageList.get(imageIndex).y = newY;
                         imageList.get(imageIndex).xEdge = imageList.get(imageIndex).x + imageList.get(imageIndex).resizedBitmap.getWidth();
                         imageList.get(imageIndex).yEdge = imageList.get(imageIndex).y + imageList.get(imageIndex).resizedBitmap.getHeight();
-                        lastSelected = -1;
                         invalidate();
                         break;
                 }

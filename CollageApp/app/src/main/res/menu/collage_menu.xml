@@ -11,14 +11,22 @@
         android:icon="@drawable/ic_save"
         app:showAsAction="always"
         />
-    <item android:id="@+id/sort_layers_action"
-        android:title="@string/sort_layers_action_title"
-        android:icon="@drawable/ic_sort"
-        app:showAsAction="always"
-        />
+
     <item android:id="@+id/pick_color_action"
         android:title="@string/pick_color_action_title"
         android:icon="@drawable/ic_color_picker"
+        app:showAsAction="always"
+        />
+
+    <item android:id="@+id/sort_layer_down_action"
+        android:title="@string/sort_layers_down_action_title"
+        android:icon="@drawable/ic_sort_down"
+        app:showAsAction="always"
+        />
+
+    <item android:id="@+id/sort_layer_up_action"
+        android:title="@string/sort_layers_up_action_title"
+        android:icon="@drawable/ic_sort_up"
         app:showAsAction="always"
         />
 
