@@ -157,6 +157,7 @@ public class MainActivity extends AppCompatActivity {
         private int lastSelected;
         private Paint paint;
         private ColorPicker cp;
+        private boolean isPressedDown;
 
         public class ImageObject{
             private static final String TAG = "CollageActivity.IO";
@@ -193,6 +194,7 @@ public class MainActivity extends AppCompatActivity {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.WHITE);
             lastSelected = -1;
+            isPressedDown = false;
             cp = new ColorPicker(MainActivity.this, 255, 255, 255);
 
             addFab.setOnClickListener(new OnClickListener() {
@@ -393,12 +395,13 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public int getImageIndex(){
+            if(isPressedDown && lastSelected != -1)
+                return lastSelected;
             int currIndex = -1;
             for (ImageObject img:imageList) {
                 if(currX >= img.x && currX <= img.xEdge && currY >= img.y && currY <= img.yEdge)
                     currIndex = imageList.indexOf(img);
             }
-            Log.d(TAG,"getImageIndex lastSelected: "+currIndex);
             lastSelected = currIndex;
             return currIndex;
         }
@@ -407,7 +410,7 @@ public class MainActivity extends AppCompatActivity {
             currX = event.getX();
             currY = event.getY();
             int imageIndex = getImageIndex();
-            mScaleDetector.onTouchEvent(event);
+            //mScaleDetector.onTouchEvent(event);
             float newX,newY;
             if(imageIndex >= 0) {
                 gestureDetector.onTouchEvent(event);
@@ -415,11 +418,12 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN: {
-
                     }
                     break;
 
                     case MotionEvent.ACTION_MOVE:
+                        if(!isPressedDown)
+                            isPressedDown = true;
                         newX = (float) (currX - (0.5 * imageList.get(imageIndex).resizedBitmap.getWidth()));
                         newY = (float) (currY - (0.5 * imageList.get(imageIndex).resizedBitmap.getHeight()));
                         if (newX < 0) newX = 0;
@@ -448,6 +452,7 @@ public class MainActivity extends AppCompatActivity {
                         imageList.get(imageIndex).y = newY;
                         imageList.get(imageIndex).xEdge = imageList.get(imageIndex).x + imageList.get(imageIndex).resizedBitmap.getWidth();
                         imageList.get(imageIndex).yEdge = imageList.get(imageIndex).y + imageList.get(imageIndex).resizedBitmap.getHeight();
+                        isPressedDown = false;
                         invalidate();
                         break;
                 }
@@ -495,7 +500,7 @@ public class MainActivity extends AppCompatActivity {
                 else
                     mScaleFactor = 0.95f;
 
-                int imageIndex = getImageIndex();
+                int imageIndex = lastSelected;
                 if (imageIndex >= 0) {
                     Log.d(TAG,"mScaleFactor: "+mScaleFactor);
                     Bitmap originalBitmap = imageList.get(imageIndex).originalBitmap;
