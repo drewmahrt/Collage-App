@@ -1,6 +1,7 @@
 package com.drewmahrt.collageapp;
 
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -15,6 +16,7 @@ import android.graphics.Point;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
@@ -38,11 +40,24 @@ import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
+import com.flask.colorpicker.ColorPickerView;
+import com.flask.colorpicker.OnColorSelectedListener;
+import com.flask.colorpicker.builder.ColorPickerClickListener;
+import com.flask.colorpicker.builder.ColorPickerDialogBuilder;
+
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import uk.co.deanwild.materialshowcaseview.MaterialShowcaseSequence;
+import uk.co.deanwild.materialshowcaseview.ShowcaseConfig;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "CollageActivity";
@@ -100,7 +115,6 @@ public class MainActivity extends AppCompatActivity {
 
         RelativeLayout rl = (RelativeLayout) findViewById(R.id.frame);
         final DrawingView dv= new DrawingView(this);
-        dv.setDrawingCacheEnabled(true);
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         params.addRule(RelativeLayout.ABOVE, R.id.toolbar_bottom);
         rl.addView(dv, params);
@@ -111,21 +125,72 @@ public class MainActivity extends AppCompatActivity {
         saveButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
+                dv.setDrawingCacheEnabled(true);
                 Bitmap bitmap = dv.getDrawingCache();
-
-                //  Get path to new gallery image
-                Uri path = getApplicationContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+                Uri uri = addImageToGallery(getApplicationContext(), "Collage", "Collage");
                 try {
-                    OutputStream stream = getApplicationContext().getContentResolver().openOutputStream(path);
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream);
+                    OutputStream outputStream = getContentResolver().openOutputStream(uri);
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                    outputStream.close();
                     Toast.makeText(getApplicationContext(), "Image saved!", Toast.LENGTH_LONG).show();
-                    finish();
-                } catch (FileNotFoundException e) {
-                    Log.e(TAG, "E: " + e.getMessage());
+                } catch (Exception e) {
+
                 }
                 return true;
             }
         });
+
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
+        //Trigger tutorial
+        ShowcaseConfig config = new ShowcaseConfig();
+        config.setDelay(500); // half second between each showcase view
+
+        MaterialShowcaseSequence sequence = new MaterialShowcaseSequence(this,"UNIQUE3");
+
+        sequence.setConfig(config);
+
+        sequence.addSequenceItem(addFab,
+                "Click here to add new photos to your collage.","GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.zoom_in_action),
+                "Click here to make the last selected image larger","GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.zoom_out_action),
+                "Click here to make the last selected image smaller","GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.sort_layer_up_action),
+                "Click here to move the last selected image up a layer.","GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.sort_layer_down_action),
+                "Click here to move the last selected image down a layer.","GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.pick_color_action),
+                "Click here to pick a new background color.", "GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.save_action),
+                "Click here to save your collage.", "GOT IT");
+
+        sequence.addSequenceItem(findViewById(R.id.close_image_action),
+                "Click here to exit.", "GOT IT");
+
+        sequence.start();
+    }
+
+    public Uri addImageToGallery(Context context, String title, String description) {
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.TITLE, title);
+        values.put(MediaStore.Images.Media.DESCRIPTION, description);
+        values.put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis());
+        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+
+        return context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
     }
 
     @Override
@@ -204,7 +269,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            colorButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            /*colorButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
                 @Override
                 public boolean onMenuItemClick(MenuItem menuItem) {
                     Log.d(TAG, "clicked picker");
@@ -225,6 +290,48 @@ public class MainActivity extends AppCompatActivity {
                             invalidate();
                         }
                     });
+                    return true;
+                }
+            });*/
+
+            colorButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    ColorPickerDialogBuilder
+                            .with(getContext())
+                            .setTitle("Choose color")
+                            .initialColor(Color.WHITE)
+                            .wheelType(ColorPickerView.WHEEL_TYPE.FLOWER)
+                            .density(12)
+                            .setOnColorSelectedListener(new OnColorSelectedListener() {
+                                @Override
+                                public void onColorSelected(int selectedColor) {
+                                    //toast("onColorSelected: 0x" + Integer.toHexString(selectedColor));
+                                }
+                            })
+                            .setPositiveButton("ok", new ColorPickerClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int selectedColor, Integer[] allColors) {
+                                    paint.setColor(selectedColor);
+                                    dialog.dismiss();
+                                    invalidate();
+                                }
+                            })
+                            .setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                    getWindow().getDecorView().setSystemUiVisibility(
+                                            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                                                    | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                                                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                                }
+                            })
+                            .build()
+                            .show();
                     return true;
                 }
             });
@@ -287,34 +394,45 @@ public class MainActivity extends AppCompatActivity {
                     super.onActivityResult(requestCode, resultCode, data);
                     fm.beginTransaction().remove(this).commit();
                     if(requestCode == PICTURE_GALLERY && resultCode == Activity.RESULT_OK && data != null){
-                        Log.d(TAG,"data: "+data.getData());
+                        /*Log.d(TAG,"data: "+data.getData());
                         Uri selectedImageUri = handleImageUri(data.getData());
                         Log.d(TAG, "URI1: " + selectedImageUri);
                         selectedImageUri = Uri.parse(Uri.decode(selectedImageUri.toString()));
 
-                        Log.d(TAG,"URI2: "+selectedImageUri);
+                        Log.d(TAG,"URI2: "+selectedImageUri);*/
 
-                        if(selectedImageUri.toString().contains("com.google.android.apps.photos")) {
+                        /*if(selectedImageUri.toString().contains("com.google.android.apps.photos")) {
                             Toast.makeText(getApplicationContext(), "Only local media works right now, sorry!", Toast.LENGTH_LONG).show();
                             return;
+                        }*/
+
+                        //String selectedImagePath = getPath(selectedImageUri);
+
+                        //Log.d(TAG, "path: " + selectedImagePath);
+                        try {
+                            Uri selectedImageUri = data.getData();
+                            Log.d(TAG, "URI1: " + selectedImageUri);
+                            InputStream inputStream = getContentResolver().openInputStream(selectedImageUri);
+                            final BitmapFactory.Options options = new BitmapFactory.Options();
+                            options.inJustDecodeBounds = true;
+                            // BitmapFactory.decodeFile(selectedImagePath,options);
+                            BitmapFactory.decodeStream(inputStream,null,options);
+                            inputStream.close();
+
+                            options.inSampleSize = calculateInSampleSize(options,screenWidth,screenHeight);
+                            options.inJustDecodeBounds = false;
+
+
+                            //Bitmap bitmap = BitmapFactory.decodeFile(selectedImagePath, options);
+                            Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(selectedImageUri),null,options);
+                            Log.d(TAG,"BITMAP: "+bitmap);
+                            //imageList.add(new ImageObject(bitmap, resizeImageForImageView(BitmapFactory.decodeFile(selectedImagePath, options), (int) (bitmap.getWidth() * 0.4), (int) (bitmap.getHeight() * 0.4))));
+                            imageList.add(new ImageObject(bitmap, resizeImageForImageView(BitmapFactory.decodeStream(getContentResolver().openInputStream(selectedImageUri),null,options), (int) (bitmap.getWidth() * 0.4), (int) (bitmap.getHeight() * 0.4))));
+                            lastSelected = imageList.size()-1;
+
+                        }catch (Exception e){
+
                         }
-
-                        String selectedImagePath = getPath(selectedImageUri);
-
-                        Log.d(TAG, "path: " + selectedImagePath);
-
-                        final BitmapFactory.Options options = new BitmapFactory.Options();
-                        options.inJustDecodeBounds = true;
-                        BitmapFactory.decodeFile(selectedImagePath,options);
-
-
-                        options.inSampleSize = calculateInSampleSize(options,screenWidth,screenHeight);
-                        options.inJustDecodeBounds = false;
-
-
-                        Bitmap bitmap = BitmapFactory.decodeFile(selectedImagePath, options);
-                        imageList.add(new ImageObject(bitmap, resizeImageForImageView(BitmapFactory.decodeFile(selectedImagePath, options), (int) (bitmap.getWidth() * 0.4), (int) (bitmap.getHeight() * 0.4))));
-                        lastSelected = imageList.size()-1;
 
                         getWindow().getDecorView().setSystemUiVisibility(
                                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -507,7 +625,14 @@ public class MainActivity extends AppCompatActivity {
                     Bitmap resizedBitmap = imageList.get(imageIndex).resizedBitmap;
                     int newHeight = (int) (resizedBitmap.getHeight() * mScaleFactor);
                     int newWidth = (int) (resizedBitmap.getWidth() * mScaleFactor);
-                    if (newHeight > 100 && newWidth > 100 && newHeight < screenHeight && newWidth < screenWidth) {
+                    //Log.d(TAG,"orig height: "+resizedBitmap.getHeight()+" new Height: "+newHeight);
+                    //Log.d(TAG,"orig width: "+resizedBitmap.getWidth()+" new width: "+newWidth);
+                    if (newHeight > 100 && newWidth > 100) {
+                        /*if(newHeight > screenHeight)
+                            newHeight = screenHeight;
+                        if(newWidth > screenWidth)
+                            newWidth = screenWidth;*/
+                        Log.d(TAG,"orig height: "+resizedBitmap.getHeight()+" final new Height: "+newHeight);
                         imageList.get(imageIndex).resizedBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, false);
                         imageList.get(imageIndex).xEdge = imageList.get(imageIndex).x + imageList.get(imageIndex).resizedBitmap.getWidth();
                         imageList.get(imageIndex).yEdge = imageList.get(imageIndex).y + imageList.get(imageIndex).resizedBitmap.getHeight();
