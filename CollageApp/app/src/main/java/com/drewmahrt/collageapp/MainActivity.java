@@ -1,7 +1,6 @@
 package com.drewmahrt.collageapp;
 
 import android.app.Activity;
-import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -11,12 +10,11 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
@@ -24,9 +22,7 @@ import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.internal.view.menu.ActionMenuItemView;
 import android.support.v7.widget.ActionMenuView;
-import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Display;
 import android.view.GestureDetector;
@@ -36,7 +32,6 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
@@ -45,18 +40,14 @@ import com.flask.colorpicker.OnColorSelectedListener;
 import com.flask.colorpicker.builder.ColorPickerClickListener;
 import com.flask.colorpicker.builder.ColorPickerDialogBuilder;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Random;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import uk.co.deanwild.materialshowcaseview.MaterialShowcaseSequence;
+import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
 import uk.co.deanwild.materialshowcaseview.ShowcaseConfig;
 
 public class MainActivity extends AppCompatActivity {
@@ -65,18 +56,17 @@ public class MainActivity extends AppCompatActivity {
     private FloatingActionButton addFab;
     private MenuItem closeButton, saveButton, sortUpButton, sortDownButton, colorButton, zoomOutButton, zoomInButton;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // TODO Auto-generated method stub
         super.onCreate(savedInstanceState);
         setContentView(R.layout.collage_creator);
-        addFab = (FloatingActionButton)findViewById(R.id.addFab);
+
         ActionMenuView bottomBar = (ActionMenuView)findViewById(R.id.amvMenu);
         Menu bottomMenu = bottomBar.getMenu();
         getMenuInflater().inflate(R.menu.collage_menu,bottomMenu);
+
+        addFab = (FloatingActionButton)findViewById(R.id.addFab);
         closeButton = bottomMenu.findItem(R.id.close_image_action);
-        Log.d("BUTTONTEST","Close button: "+closeButton.getTitle());
         saveButton = bottomMenu.findItem(R.id.save_action);
         sortUpButton = bottomMenu.findItem(R.id.sort_layer_up_action);
         sortDownButton = bottomMenu.findItem(R.id.sort_layer_down_action);
@@ -149,38 +139,13 @@ public class MainActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
         //Trigger tutorial
-        ShowcaseConfig config = new ShowcaseConfig();
-        config.setDelay(500); // half second between each showcase view
-
-        MaterialShowcaseSequence sequence = new MaterialShowcaseSequence(this,"UNIQUE3");
-
-        sequence.setConfig(config);
-
-        sequence.addSequenceItem(addFab,
-                "Click here to add new photos to your collage.","GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.zoom_in_action),
-                "Click here to make the last selected image larger","GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.zoom_out_action),
-                "Click here to make the last selected image smaller","GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.sort_layer_up_action),
-                "Click here to move the last selected image up a layer.","GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.sort_layer_down_action),
-                "Click here to move the last selected image down a layer.","GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.pick_color_action),
-                "Click here to pick a new background color.", "GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.save_action),
-                "Click here to save your collage.", "GOT IT");
-
-        sequence.addSequenceItem(findViewById(R.id.close_image_action),
-                "Click here to exit.", "GOT IT");
-
-        sequence.start();
+        new MaterialShowcaseView.Builder(this)
+                .setTarget(addFab)
+                .setDismissText("GOT IT")
+                .setDismissOnTouch(true)
+                .setContentText("Click here to add new photos to your collage. \n\nPlace your finger on a photo and drag to move it. \n\nHold your finger on a picture without moving to delete it.")
+                .singleUse("PICTURE DETAILS") // provide a unique ID used to ensure it is only shown once
+                .show();
     }
 
     public Uri addImageToGallery(Context context, String title, String description) {
@@ -221,7 +186,6 @@ public class MainActivity extends AppCompatActivity {
         private float currX,currY;
         private int lastSelected;
         private Paint paint;
-        private ColorPicker cp;
         private boolean isPressedDown;
 
         public class ImageObject{
@@ -260,39 +224,13 @@ public class MainActivity extends AppCompatActivity {
             paint.setColor(Color.WHITE);
             lastSelected = -1;
             isPressedDown = false;
-            cp = new ColorPicker(MainActivity.this, 255, 255, 255);
 
             addFab.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                   selectImage();
+                    selectImage();
                 }
             });
-
-            /*colorButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-                @Override
-                public boolean onMenuItemClick(MenuItem menuItem) {
-                    Log.d(TAG, "clicked picker");
-                    cp.show();
-
-                    Button okColor = (Button)cp.findViewById(R.id.okColorButton);
-                    okColor.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            // Or the android RGB Color (see the android Color class reference)
-                            int red = cp.getRed();
-                            int blue = cp.getBlue();
-                            int green = cp.getGreen();
-                            Log.d(TAG, "Current paint color(before): " + paint.getColor());
-                            Log.d(TAG, "Color chosen: " + red + " " + blue + " " + green);
-                            paint.setARGB(255, red, green, blue);
-                            cp.dismiss();
-                            invalidate();
-                        }
-                    });
-                    return true;
-                }
-            });*/
 
             colorButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
                 @Override
@@ -355,10 +293,10 @@ public class MainActivity extends AppCompatActivity {
             sortDownButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
                 @Override
                 public boolean onMenuItemClick(MenuItem menuItem) {
-                    Log.d(TAG,"Sort down with "+lastSelected);
-                    if(lastSelected > 0){
+                    Log.d(TAG, "Sort down with " + lastSelected);
+                    if (lastSelected > 0) {
                         ImageObject temp = imageList.remove(lastSelected);
-                        imageList.add(lastSelected-1,temp);
+                        imageList.add(lastSelected - 1, temp);
                         Log.d(TAG, "Down: Moving from " + lastSelected + " to " + (lastSelected - 1));
                         lastSelected--;
                         invalidate();
@@ -370,10 +308,10 @@ public class MainActivity extends AppCompatActivity {
             sortUpButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
                 @Override
                 public boolean onMenuItemClick(MenuItem menuItem) {
-                    Log.d(TAG,"Sort up with "+lastSelected);
-                    if(lastSelected >= 0 && lastSelected < imageList.size()-1){
+                    Log.d(TAG, "Sort up with " + lastSelected);
+                    if (lastSelected >= 0 && lastSelected < imageList.size() - 1) {
                         ImageObject temp = imageList.remove(lastSelected);
-                        imageList.add(lastSelected+1,temp);
+                        imageList.add(lastSelected + 1, temp);
                         Log.d(TAG, "Up: Moving from " + lastSelected + " to " + (lastSelected + 1));
                         lastSelected++;
                         invalidate();
@@ -390,7 +328,6 @@ public class MainActivity extends AppCompatActivity {
             Fragment auxiliary = new Fragment() {
                 @Override
                 public void onActivityResult(int requestCode, int resultCode, Intent data) {
-                    //DO WHATEVER YOU NEED
                     super.onActivityResult(requestCode, resultCode, data);
                     fm.beginTransaction().remove(this).commit();
                     if(requestCode == PICTURE_GALLERY && resultCode == Activity.RESULT_OK && data != null){
@@ -448,19 +385,37 @@ public class MainActivity extends AppCompatActivity {
             fm.beginTransaction().add(auxiliary, "FRAGMENT_TAG").commit();
             fm.executePendingTransactions();
 
-            auxiliary.startActivityForResult(new Intent(Intent.ACTION_PICK,MediaStore.Images.Media.INTERNAL_CONTENT_URI),PICTURE_GALLERY);
-        }
+            auxiliary.startActivityForResult(new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI), PICTURE_GALLERY);
 
-        public Uri handleImageUri(Uri uri) {
-            Pattern pattern = Pattern.compile("(content://media/.*\\d)(/ACTUAL.*)");
-            if (uri.getPath().contains("content")) {
-                Matcher matcher = pattern.matcher(uri.getPath());
-                if (matcher.find())
-                    return Uri.parse(matcher.group(1));
-                else
-                    throw new IllegalArgumentException("Cannot handle this URI");
-            } else
-                return uri;
+            ShowcaseConfig config = new ShowcaseConfig();
+            config.setDelay(250); // quarter second between each showcase view
+
+            MaterialShowcaseSequence sequence = new MaterialShowcaseSequence((Activity)getContext(),"CONTROLS");
+
+            sequence.setConfig(config);
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.zoom_in_action),
+                    "Click here to make the last selected image larger","GOT IT");
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.zoom_out_action),
+                    "Click here to make the last selected image smaller","GOT IT");
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.sort_layer_up_action),
+                    "Click here to move the last selected image up a layer.", "GOT IT");
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.sort_layer_down_action),
+                    "Click here to move the last selected image down a layer.", "GOT IT");
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.pick_color_action),
+                    "Click here to pick a new background color.", "GOT IT");
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.save_action),
+                    "Click here to save your collage.", "GOT IT");
+
+            sequence.addSequenceItem(((Activity) getContext()).findViewById(R.id.close_image_action),
+                    "Click here to exit.", "GOT IT");
+
+            sequence.start();
         }
 
         public Bitmap resizeImageForImageView(Bitmap bitmap, int newWidth, int newHeight){
@@ -495,21 +450,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             return inSampleSize;
-        }
-
-        public String getPath(Uri uri){
-            if(uri == null){
-                return null;
-            }
-
-            String[] projection = {MediaStore.Images.Media.DATA};
-            Cursor cursor = getApplicationContext().getContentResolver().query(uri,projection,null,null,null);
-            if(cursor != null){
-                int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-                cursor.moveToFirst();
-                return cursor.getString(column_index);
-            }
-            return uri.getPath();
         }
 
         public int getImageIndex(){
