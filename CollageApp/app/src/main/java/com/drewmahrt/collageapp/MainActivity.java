@@ -1,35 +1,33 @@
 package com.drewmahrt.collageapp;
 
-import android.app.Activity;
+import android.Manifest;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Point;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
-import android.support.v4.app.FragmentManager;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.ActionMenuView;
 import android.util.Log;
-import android.view.Display;
-import android.view.GestureDetector;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
-import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
@@ -38,28 +36,46 @@ import com.flask.colorpicker.OnColorSelectedListener;
 import com.flask.colorpicker.builder.ColorPickerClickListener;
 import com.flask.colorpicker.builder.ColorPickerDialogBuilder;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.List;
 
 import uk.co.deanwild.materialshowcaseview.MaterialShowcaseSequence;
 import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
 import uk.co.deanwild.materialshowcaseview.ShowcaseConfig;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements View.OnTouchListener {
     private static final String TAG = "CollageActivity";
     private static final int PICTURE_GALLERY = 1;
+    private static final int STORAGE_PERMISSION = 0;
     private FloatingActionButton addFab;
     private MenuItem closeButton, saveButton, sortUpButton, sortDownButton, colorButton, zoomOutButton, zoomInButton;
+    private FrameLayout mCollageContainer;
+
+    private List<CollageImage> mCollageImages;
+
+    private int _xDelta;
+    private int _yDelta;
+    private int mStartX, mStartY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.collage_creator);
 
+
+
         ActionMenuView bottomBar = (ActionMenuView)findViewById(R.id.amvMenu);
         Menu bottomMenu = bottomBar.getMenu();
         getMenuInflater().inflate(R.menu.collage_menu,bottomMenu);
+
+        mCollageImages = new ArrayList<>();
 
         addFab = (FloatingActionButton)findViewById(R.id.addFab);
         closeButton = bottomMenu.findItem(R.id.close_image_action);
@@ -69,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
         colorButton = bottomMenu.findItem(R.id.pick_color_action);
         zoomOutButton = bottomMenu.findItem(R.id.zoom_out_action);
         zoomInButton = bottomMenu.findItem(R.id.zoom_in_action);
+        mCollageContainer = (FrameLayout)findViewById(R.id.collage_container);
 
         final Context alertContext = this;
         closeButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
@@ -100,10 +117,10 @@ public class MainActivity extends AppCompatActivity {
         });
 
         RelativeLayout rl = (RelativeLayout) findViewById(R.id.frame);
-        final CollageContainer dv= new CollageContainer(this);
+        //final CollageContainer dv= new CollageContainer(this);
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         params.addRule(RelativeLayout.ABOVE, R.id.toolbar_bottom);
-        rl.addView(dv, params);
+        //rl.addView(dv, params);
 
         //Fix to bring FAB on top for 4.x devices
         addFab.bringToFront();
@@ -111,17 +128,7 @@ public class MainActivity extends AppCompatActivity {
         saveButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
-                dv.setDrawingCacheEnabled(true);
-                Bitmap bitmap = dv.getDrawingCache();
-                Uri uri = addImageToGallery(getApplicationContext(), "Collage", "Collage");
-                try {
-                    OutputStream outputStream = getContentResolver().openOutputStream(uri);
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
-                    outputStream.close();
-                    Toast.makeText(getApplicationContext(), "Image saved!", Toast.LENGTH_LONG).show();
-                } catch (Exception e) {
-
-                }
+                saveCollage();
                 return true;
             }
         });
@@ -134,12 +141,26 @@ public class MainActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
-        addFab.setOnClickListener(dv);
-        colorButton.setOnMenuItemClickListener(dv);
-        zoomInButton.setOnMenuItemClickListener(dv);
-        zoomOutButton.setOnMenuItemClickListener(dv);
-        sortDownButton.setOnMenuItemClickListener(dv);
-        sortUpButton.setOnMenuItemClickListener(dv);
+        addFab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
+                photoPickerIntent.setType("image/*");
+                startActivityForResult(photoPickerIntent, PICTURE_GALLERY);
+            }
+        });
+
+        colorButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem item) {
+                colorButtonPressed();
+                return false;
+            }
+        });
+//        zoomInButton.setOnMenuItemClickListener(dv);
+//        zoomOutButton.setOnMenuItemClickListener(dv);
+//        sortDownButton.setOnMenuItemClickListener(dv);
+//        sortUpButton.setOnMenuItemClickListener(dv);
 
         //Trigger tutorial
         new MaterialShowcaseView.Builder(this)
@@ -149,10 +170,6 @@ public class MainActivity extends AppCompatActivity {
                 .setContentText("Click here to add new photos to your collage. \n\nPlace your finger on a photo and drag to move it. \n\nHold your finger on a picture without moving to delete it.")
                 .singleUse("PICTURE DETAILS") // provide a unique ID used to ensure it is only shown once
                 .show();
-    }
-
-    public void addFabClicked(CollageContainer container){
-
     }
 
     public Uri addImageToGallery(Context context, String title, String description) {
@@ -178,9 +195,226 @@ public class MainActivity extends AppCompatActivity {
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-        if (id == R.id.action_settings) {
-            return true;
-        }
+
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+        // View holds position while being chosen to be delete or edited
+//        if (mEditingOrDeleting) {
+//            return false;
+//        }
+
+
+        FrameLayout.LayoutParams layoutParams =
+                (FrameLayout.LayoutParams) view.getLayoutParams();
+
+        switch (motionEvent.getAction() & MotionEvent.ACTION_MASK) {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN:
+                mStartX = (int) motionEvent.getX();
+                mStartY = (int) motionEvent.getY();
+                break;
+
+            case MotionEvent.ACTION_MOVE:
+                int delta_x = (int) motionEvent.getX() - mStartX;
+                int delta_y = (int) motionEvent.getY() - mStartY;
+                layoutParams.leftMargin = layoutParams.leftMargin + delta_x;
+                layoutParams.rightMargin = layoutParams.rightMargin - delta_x;
+                layoutParams.topMargin = layoutParams.topMargin + delta_y;
+                layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y;
+                view.setLayoutParams(layoutParams);
+                break;
+
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP:
+                break;
+        }
+        mCollageContainer.invalidate();
+        return true;
+    }
+
+
+    public Bitmap getResizedBitmap(Bitmap image, int maxSize) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        float bitmapRatio = (float)width / (float) height;
+        if (bitmapRatio > 1) {
+            width = maxSize;
+            height = (int) (width / bitmapRatio);
+        } else {
+            height = maxSize;
+            width = (int) (height * bitmapRatio);
+        }
+        Log.d(TAG, "getResizedBitmap: width: "+width+"  height: "+height);
+        return Bitmap.createScaledBitmap(image, width, height, true);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode){
+            case PICTURE_GALLERY:
+                if (resultCode == RESULT_OK) {
+                    try {
+                        Uri imageUri = data.getData();
+                        InputStream imageStream = getContentResolver().openInputStream(imageUri);
+                        Bitmap selectedImage = BitmapFactory.decodeStream(imageStream);
+                        selectedImage = getResizedBitmap(selectedImage, 500);// 400 is for example, replace with desired size
+                        ImageView newImage = new ImageView(this);
+                        ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+                        newImage.setLayoutParams(layoutParams);
+                        newImage.setImageBitmap(selectedImage);
+                        newImage.setOnTouchListener(this);
+                        mCollageContainer.addView(newImage);
+//                        mCollageImages.add(new CollageImage(selectedImage.getWidth(),selectedImage.getHeight(),imageUri,newImage.getId()));
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }
+        }
+
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    public void saveCollage(){
+
+        if (ContextCompat.checkSelfPermission(MainActivity.this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(MainActivity.this,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        0);
+        }else {
+
+            //Find the view we are after
+            View view = (View) findViewById(R.id.collage_container);
+            //Create a Bitmap with the same dimensions
+            Bitmap image = Bitmap.createBitmap(mCollageContainer.getWidth(),
+                    view.getHeight(),
+                    Bitmap.Config.RGB_565);
+            //Draw the view inside the Bitmap
+            Canvas testcanvas = new Canvas();
+            view.draw(new Canvas(image));
+
+            //TODO: Make the pictures save in the correct folder
+            String path = Environment.getExternalStorageDirectory().toString();
+            OutputStream fOut = null;
+            File file = new File(path, "collage" + System.currentTimeMillis() + ".jpg"); // the File to save to
+            try {
+                fOut = new FileOutputStream(file);
+                image.compress(Bitmap.CompressFormat.JPEG, 90, fOut); // saving the Bitmap to a file compressed as a JPEG with 85% compression rate
+                fOut.flush();
+                fOut.close(); // do not forget to close the stream
+
+                MediaStore.Images.Media.insertImage(getContentResolver(), file.getAbsolutePath(), file.getName(), file.getName());
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(System.currentTimeMillis());
+        File storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/Camera/");
+        if (!storageDir.exists())
+            storageDir.mkdirs();
+        File image = File.createTempFile(
+                timeStamp,                   /* prefix */
+                ".jpeg",                     /* suffix */
+                storageDir                   /* directory */
+        );
+        return image;
+    }
+
+    public static void addPicToGallery(Context context, String photoPath) {
+        Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+        File f = new File(photoPath);
+        Uri contentUri = Uri.fromFile(f);
+        mediaScanIntent.setData(contentUri);
+        context.sendBroadcast(mediaScanIntent);
+    }
+
+    private void colorButtonPressed() {
+        ColorPickerDialogBuilder
+                .with(MainActivity.this)
+                .setTitle("Choose color")
+                .initialColor(Color.WHITE)
+                .wheelType(ColorPickerView.WHEEL_TYPE.FLOWER)
+                .density(12)
+                .setOnColorSelectedListener(new OnColorSelectedListener() {
+                    @Override
+                    public void onColorSelected(int selectedColor) {
+                        //toast("onColorSelected: 0x" + Integer.toHexString(selectedColor));
+                    }
+                })
+                .setPositiveButton("ok", new ColorPickerClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int selectedColor, Integer[] allColors) {
+                        mCollageContainer.setBackgroundColor(selectedColor);
+                        dialog.dismiss();
+                        mCollageContainer.invalidate();
+                        getWindow().getDecorView().setSystemUiVisibility(
+                                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                    }
+                })
+                .setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        getWindow().getDecorView().setSystemUiVisibility(
+                                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                    }
+                })
+                .build()
+                .show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case STORAGE_PERMISSION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    saveCollage();
+
+                } else {
+
+                    Toast.makeText(this, "Images cannot be saved without storage access", Toast.LENGTH_SHORT).show();
+                }
+            }
+            break;
+        }
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 }
