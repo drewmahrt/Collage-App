@@ -5,15 +5,4 @@
     <color name="default_background">#00ffffff</color>
     <color name="floating_action_button_color">#ff0000</color>
     <color name="toolbar_background">#5cff0000</color>
-    <color name="materialcolorpicker__white">#ffffff</color>
-    <color name="materialcolorpicker__red">#f44336</color>
-    <color name="materialcolorpicker__green">#4caf50</color>
-    <color name="materialcolorpicker__blue">#2196f3</color>
-    <color name="materialcolorpicker__grey">#b3b3b3</color>
-    <color name="materialcolorpicker__lightgrey">#d9d9d9</color>
-    <color name="materialcolorpicker__dribble">#ea4c89</color>
-    <color name="materialcolorpicker__dribbledark">#c32361</color>
-    <color name="materialcolorpicker__black">#000000</color>
-    <color name="materialcolorpicker__dialogcolor">#009688</color>
-    <color name="hint_foreground_material_light">#009688</color>
 </resources>
