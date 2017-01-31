@@ -24,6 +24,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -46,17 +47,19 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import uk.co.deanwild.materialshowcaseview.MaterialShowcaseSequence;
 import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
-import uk.co.deanwild.materialshowcaseview.ShowcaseConfig;
 
-public class MainActivity extends AppCompatActivity implements View.OnTouchListener {
+public class MainActivity extends AppCompatActivity implements View.OnTouchListener, MenuItem.OnMenuItemClickListener, View.OnFocusChangeListener {
     private static final String TAG = "CollageActivity";
     private static final int PICTURE_GALLERY = 1;
     private static final int STORAGE_PERMISSION = 0;
     private FloatingActionButton addFab;
-    private MenuItem closeButton, saveButton, sortUpButton, sortDownButton, colorButton, zoomOutButton, zoomInButton;
+    private MenuItem deleteButton, saveButton, sortUpButton, colorButton, zoomOutButton, zoomInButton;
     private FrameLayout mCollageContainer;
+    private ScaleGestureDetector mScaleDetector;
+    private boolean isScaling;
+    private int touchedId;
+
 
     private List<CollageImage> mCollageImages;
 
@@ -78,17 +81,21 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mCollageImages = new ArrayList<>();
 
         addFab = (FloatingActionButton)findViewById(R.id.addFab);
-        closeButton = bottomMenu.findItem(R.id.close_image_action);
+        deleteButton = bottomMenu.findItem(R.id.delete_image_action);
         saveButton = bottomMenu.findItem(R.id.save_action);
         sortUpButton = bottomMenu.findItem(R.id.sort_layer_up_action);
-        sortDownButton = bottomMenu.findItem(R.id.sort_layer_down_action);
+//        sortDownButton = bottomMenu.findItem(R.id.sort_layer_down_action);
         colorButton = bottomMenu.findItem(R.id.pick_color_action);
-        zoomOutButton = bottomMenu.findItem(R.id.zoom_out_action);
-        zoomInButton = bottomMenu.findItem(R.id.zoom_in_action);
+//        zoomOutButton = bottomMenu.findItem(R.id.zoom_out_action);
+//        zoomInButton = bottomMenu.findItem(R.id.zoom_in_action);
         mCollageContainer = (FrameLayout)findViewById(R.id.collage_container);
+        mCollageContainer.setOnTouchListener(this);
+
+        isScaling = false;
+        touchedId = -1;
 
         final Context alertContext = this;
-        closeButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+        deleteButton.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
                 new AlertDialog.Builder(alertContext)
@@ -160,7 +167,60 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
 //        zoomInButton.setOnMenuItemClickListener(dv);
 //        zoomOutButton.setOnMenuItemClickListener(dv);
 //        sortDownButton.setOnMenuItemClickListener(dv);
-//        sortUpButton.setOnMenuItemClickListener(dv);
+        sortUpButton.setOnMenuItemClickListener(this);
+        deleteButton.setOnMenuItemClickListener(this);
+
+        mScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.OnScaleGestureListener() {
+            @Override
+            public void onScaleEnd(ScaleGestureDetector detector) {
+                isScaling = false;
+            }
+            @Override
+            public boolean onScaleBegin(ScaleGestureDetector detector) {
+                isScaling = true;
+                return true;
+            }
+            @Override
+            public boolean onScale(ScaleGestureDetector detector) {
+                Log.d(TAG, "scale: " + detector.getScaleFactor());
+                View image = mCollageContainer.getFocusedChild();
+
+                float scale = detector.getScaleFactor();
+                if(scale < 1)
+                    scale = 0.95f;
+                else
+                    scale = 1.05f;
+
+                float height = image.getHeight() * scale;
+                float width = image.getWidth() * scale;
+
+                if(Math.abs(image.getHeight()-height) > 10){
+                    if(image.getHeight() - height < 0){
+                        //image scaled up, but too fast
+                        height = image.getHeight() + 10;
+                    }else {
+                        height = image.getHeight() - 10;
+
+                    }
+                }
+
+                if(Math.abs(image.getWidth()-width) > 10){
+                    if(image.getWidth() - width < 0){
+                        //image scaled up, but too fast
+                        width = image.getWidth() + 10;
+                    }else {
+                        width = image.getWidth() - 10;
+
+                    }
+                }
+                Log.d(TAG, "onScale: height orig: "+image.getHeight()+" new: "+height);
+                Log.d(TAG, "onScale: width orig: "+image.getWidth()+" new: "+width);
+
+                image.setMinimumHeight((int)height);
+                image.setMinimumWidth((int)width);
+                return false;
+            }
+        });
 
         //Trigger tutorial
         new MaterialShowcaseView.Builder(this)
@@ -180,6 +240,12 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
 
         return context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+    }
+
+    private void bringToFront(){
+        if(mCollageContainer.getFocusedChild() != null) {
+            mCollageContainer.getFocusedChild().bringToFront();
+        }
     }
 
     @Override
@@ -210,27 +276,38 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         FrameLayout.LayoutParams layoutParams =
                 (FrameLayout.LayoutParams) view.getLayoutParams();
 
-        switch (motionEvent.getAction() & MotionEvent.ACTION_MASK) {
-            case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_POINTER_DOWN:
-                mStartX = (int) motionEvent.getX();
-                mStartY = (int) motionEvent.getY();
-                break;
+        Log.d(TAG, "onTouch: touchedId: "+touchedId+"   current: "+view.getId());
+        if(motionEvent.getPointerCount() > 1 && touchedId != -1){
+            Log.d(TAG, "onTouch: scaling");
+            mScaleDetector.onTouchEvent(motionEvent);
+        } else if(!isScaling && (touchedId == view.getId() || touchedId == -1)) {
+            view.requestFocus();
+            view.requestFocusFromTouch();
+            switch (motionEvent.getAction() & MotionEvent.ACTION_MASK) {
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    touchedId = view.getId();
+                    mStartX = (int) motionEvent.getX();
+                    mStartY = (int) motionEvent.getY();
+                    break;
 
-            case MotionEvent.ACTION_MOVE:
-                int delta_x = (int) motionEvent.getX() - mStartX;
-                int delta_y = (int) motionEvent.getY() - mStartY;
-                layoutParams.leftMargin = layoutParams.leftMargin + delta_x;
-                layoutParams.rightMargin = layoutParams.rightMargin - delta_x;
-                layoutParams.topMargin = layoutParams.topMargin + delta_y;
-                layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y;
-                view.setLayoutParams(layoutParams);
-                break;
+                case MotionEvent.ACTION_MOVE:
+                    int delta_x = (int) motionEvent.getX() - mStartX;
+                    int delta_y = (int) motionEvent.getY() - mStartY;
+                    layoutParams.leftMargin = layoutParams.leftMargin + delta_x;
+                    layoutParams.rightMargin = layoutParams.rightMargin - delta_x;
+                    layoutParams.topMargin = layoutParams.topMargin + delta_y;
+                    layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y;
+                    view.setLayoutParams(layoutParams);
+                    break;
 
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_POINTER_UP:
-                break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP:
+                    touchedId = -1;
+                    break;
+            }
         }
+
         mCollageContainer.invalidate();
         return true;
     }
@@ -266,7 +343,13 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
                         newImage.setLayoutParams(layoutParams);
                         newImage.setImageBitmap(selectedImage);
+                        newImage.setFocusableInTouchMode(true);
+                        newImage.setFocusable(true);
                         newImage.setOnTouchListener(this);
+                        newImage.setOnFocusChangeListener(this);
+                        newImage.setId(View.generateViewId());
+                        newImage.requestFocus();
+                        newImage.requestFocusFromTouch();
                         mCollageContainer.addView(newImage);
 //                        mCollageImages.add(new CollageImage(selectedImage.getWidth(),selectedImage.getHeight(),imageUri,newImage.getId()));
                     } catch (FileNotFoundException e) {
@@ -295,6 +378,11 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         0);
         }else {
 
+            //remove selected image border
+            if(mCollageContainer.getFocusedChild() != null) {
+                mCollageContainer.getFocusedChild().setBackgroundResource(R.drawable.unselected_border);
+            }
+
             //Find the view we are after
             View view = (View) findViewById(R.id.collage_container);
             //Create a Bitmap with the same dimensions
@@ -316,6 +404,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 fOut.close(); // do not forget to close the stream
 
                 MediaStore.Images.Media.insertImage(getContentResolver(), file.getAbsolutePath(), file.getName(), file.getName());
+                Toast.makeText(this, "Collage saved!", Toast.LENGTH_SHORT).show();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -416,5 +505,35 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
                         | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    @Override
+    public boolean onMenuItemClick(MenuItem item) {
+        switch (item.getItemId()){
+            case R.id.sort_layer_up_action:
+                bringToFront();
+                break;
+            case R.id.delete_image_action:
+                deleteSelectedImage();
+                break;
+        }
+        return true;
+    }
+
+    private void deleteSelectedImage(){
+        if(mCollageContainer.getFocusedChild() != null){
+            Log.d(TAG, "deleteSelectedImage: ");
+            mCollageContainer.removeView(mCollageContainer.getFocusedChild());
+        }
+    }
+
+    @Override
+    public void onFocusChange(View v, boolean hasFocus) {
+        if(hasFocus){
+            Log.d(TAG, "onFocusChange: ");
+            v.setBackgroundResource(R.drawable.selected_border);
+        } else {
+            v.setBackgroundResource(R.drawable.unselected_border);
+        }
     }
 }

@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Collage App</string>
     <string name="save_action_title">Save Image</string>
-    <string name="close_action_title">Close Collage</string>
+    <string name="delete_action_title">Delete Latest Image</string>
     <string name="zoom_in_action_title">Zoom In</string>
     <string name="zoom_out_action_title">Zoom Out</string>
     <string name="pick_color_action_title">Choose Background</string>

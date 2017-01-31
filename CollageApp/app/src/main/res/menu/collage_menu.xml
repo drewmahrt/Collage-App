@@ -1,7 +1,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto" >
-    <item android:id="@+id/close_image_action"
-        android:title="@string/close_action_title"
+    <item android:id="@+id/delete_image_action"
+        android:title="@string/delete_action_title"
         android:icon="@drawable/ic_clear"
         app:showAsAction="always"
         />
@@ -18,11 +18,11 @@
         app:showAsAction="always"
         />
 
-    <item android:id="@+id/sort_layer_down_action"
-        android:title="@string/sort_layers_down_action_title"
-        android:icon="@drawable/ic_sort_down"
-        app:showAsAction="always"
-        />
+    <!--<item android:id="@+id/sort_layer_down_action"-->
+        <!--android:title="@string/sort_layers_down_action_title"-->
+        <!--android:icon="@drawable/ic_sort_down"-->
+        <!--app:showAsAction="always"-->
+        <!--/>-->
 
     <item android:id="@+id/sort_layer_up_action"
         android:title="@string/sort_layers_up_action_title"
@@ -30,15 +30,15 @@
         app:showAsAction="always"
         />
 
-    <item android:id="@+id/zoom_out_action"
-        android:title="@string/zoom_out_action_title"
-        android:icon="@drawable/ic_zoom_out"
-        app:showAsAction="always"
-        />
+    <!--<item android:id="@+id/zoom_out_action"-->
+        <!--android:title="@string/zoom_out_action_title"-->
+        <!--android:icon="@drawable/ic_zoom_out"-->
+        <!--app:showAsAction="always"-->
+        <!--/>-->
 
-    <item android:id="@+id/zoom_in_action"
-        android:title="@string/zoom_in_action_title"
-        android:icon="@drawable/ic_zoom_in"
-        app:showAsAction="always"
-        />
+    <!--<item android:id="@+id/zoom_in_action"-->
+        <!--android:title="@string/zoom_in_action_title"-->
+        <!--android:icon="@drawable/ic_zoom_in"-->
+        <!--app:showAsAction="always"-->
+        <!--/>-->
 </menu>
