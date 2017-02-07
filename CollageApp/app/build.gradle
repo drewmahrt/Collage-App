@@ -31,5 +31,4 @@ dependencies {
     compile 'com.android.support:appcompat-v7:25.1.0'
     compile 'com.android.support:design:25.1.0'
     compile 'com.github.QuadFlask:colorpicker:0.0.9'
-    compile 'com.github.deano2390:MaterialShowcaseView:1.0.5'
 }
