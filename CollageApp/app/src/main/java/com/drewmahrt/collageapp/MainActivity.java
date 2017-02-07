@@ -116,7 +116,6 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
             }
             @Override
             public boolean onScale(ScaleGestureDetector detector) {
-                Log.d(TAG, "scale: " + detector.getScaleFactor());
                 View image = mCollageContainer.getFocusedChild();
 
                 float scale = detector.getScaleFactor();
@@ -264,11 +263,12 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 .setTitle("Choose color")
                 .initialColor(Color.WHITE)
                 .wheelType(ColorPickerView.WHEEL_TYPE.FLOWER)
+                .noSliders()
                 .density(12)
                 .setOnColorSelectedListener(new OnColorSelectedListener() {
                     @Override
                     public void onColorSelected(int selectedColor) {
-                        //toast("onColorSelected: 0x" + Integer.toHexString(selectedColor));
+
                     }
                 })
                 .setPositiveButton("ok", new ColorPickerClickListener() {

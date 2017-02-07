@@ -66,10 +66,10 @@ public class ImageUtility {
             //TODO: Make the pictures save in the correct folder
             String path = Environment.getExternalStorageDirectory().toString();
             OutputStream fOut = null;
-            File file = new File(path, "collage" + System.currentTimeMillis() + ".jpg"); // the File to save to
+            File file = new File(path, "collage" + System.currentTimeMillis() + ".png"); // the File to save to
             try {
                 fOut = new FileOutputStream(file);
-                image.compress(Bitmap.CompressFormat.JPEG, 90, fOut); // saving the Bitmap to a file compressed as a JPEG with 85% compression rate
+                image.compress(Bitmap.CompressFormat.PNG, 100, fOut); // saving the Bitmap to a file compressed as a JPEG with 90% compression rate
                 fOut.flush();
                 fOut.close(); // do not forget to close the stream
 
