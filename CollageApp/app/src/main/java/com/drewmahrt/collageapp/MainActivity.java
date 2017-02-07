@@ -36,8 +36,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
-
 public class MainActivity extends AppCompatActivity implements View.OnTouchListener, MenuItem.OnMenuItemClickListener, View.OnFocusChangeListener {
     private static final String TAG = "CollageActivity";
     private static final int PICTURE_GALLERY = 1;
@@ -97,6 +95,12 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mDeleteButton.setOnMenuItemClickListener(this);
 
         setupScaleDetector();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        restoreFullScreen();
     }
 
     private void setupScaleDetector() {
@@ -175,6 +179,10 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
 
     @Override
     public boolean onTouch(View view, MotionEvent motionEvent) {
+
+        //Check for touching background of canvas which causes ClassCastException for RelativeLayout to FrameLayout
+        if(view.getId() == R.id.collage_container)
+            return false;
 
         FrameLayout.LayoutParams layoutParams =
                 (FrameLayout.LayoutParams) view.getLayoutParams();
