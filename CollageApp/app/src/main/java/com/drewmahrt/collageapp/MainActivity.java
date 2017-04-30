@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -30,6 +31,9 @@ import com.flask.colorpicker.ColorPickerView;
 import com.flask.colorpicker.OnColorSelectedListener;
 import com.flask.colorpicker.builder.ColorPickerClickListener;
 import com.flask.colorpicker.builder.ColorPickerDialogBuilder;
+import com.getkeepsafe.taptargetview.TapTarget;
+import com.getkeepsafe.taptargetview.TapTargetView;
+
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -40,6 +44,12 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     private static final String TAG = "CollageActivity";
     private static final int PICTURE_GALLERY = 1;
     private static final int STORAGE_PERMISSION = 0;
+
+    private static final String ADD_PREFERENCES_KEY = "add_tutorial";
+    private static final String BACKGROUND_PREFERENCES_KEY = "background_tutorial";
+    private static final String LAYER_PREFERENCES_KEY = "layer_tutorial";
+
+    private SharedPreferences mPreferences;
 
     private FloatingActionButton mAddImageButton;
     private MenuItem mDeleteButton, mSaveButton, mSortUpButton, mChooseColorButton;
@@ -57,6 +67,8 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.collage_creator);
+
+        mPreferences = getPreferences(MODE_PRIVATE);
 
         ActionMenuView bottomBar = (ActionMenuView)findViewById(R.id.amvMenu);
         Menu bottomMenu = bottomBar.getMenu();
@@ -83,9 +95,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mAddImageButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
-                photoPickerIntent.setType("image/*");
-                startActivityForResult(photoPickerIntent, PICTURE_GALLERY);
+                startPhotoPicker();
             }
         });
 
@@ -95,7 +105,46 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mDeleteButton.setOnMenuItemClickListener(this);
 
         setupScaleDetector();
+
+        //If first time launching, show add picture tutorial
+        if(!mPreferences.getBoolean(ADD_PREFERENCES_KEY,false))
+            triggerIntroShowcase(R.id.addFab,"Tap here to add you first photo!",ADD_PREFERENCES_KEY);
     }
+
+    private void startPhotoPicker() {
+        Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
+        photoPickerIntent.setType("image/*");
+        startActivityForResult(photoPickerIntent, PICTURE_GALLERY);
+    }
+
+    private void triggerIntroShowcase(final int id, String message, final String preferencesKey) {
+        TapTargetView.showFor(this,
+                TapTarget.forView(findViewById(id),message)
+                .transparentTarget(true)
+                .cancelable(false),
+                new TapTargetView.Listener(){
+                    @Override
+                    public void onTargetClick(TapTargetView view) {
+                        mPreferences.edit().putBoolean(preferencesKey,true).apply();
+                        view.dismiss(true);
+
+                        switch (id){
+                            case R.id.addFab:
+                                startPhotoPicker();
+                                break;
+                            case R.id.pick_color_action:
+                                colorButtonPressed();
+                                break;
+                            case R.id.sort_layer_up_action:
+                                bringToFront();
+                                break;
+                        }
+                    }
+                }
+        );
+    }
+
+
 
     @Override
     protected void onResume() {
@@ -246,6 +295,14 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         newImage.requestFocusFromTouch();
                         mCollageContainer.addView(newImage);
                         mCollageImages.add(new CollageImage(selectedImage.getWidth(),selectedImage.getHeight(),imageUri,newImage.getId()));
+
+                        //If first time adding a picture, show background color tutorial
+                        if(!mPreferences.getBoolean(BACKGROUND_PREFERENCES_KEY,false))
+                            triggerIntroShowcase(R.id.pick_color_action,"Tap here to choose your background color.",BACKGROUND_PREFERENCES_KEY);
+
+                        //If first time with two pictures, show layer button tutorial
+                        if(mCollageImages.size() > 1 && !mPreferences.getBoolean(LAYER_PREFERENCES_KEY,false))
+                            triggerIntroShowcase(R.id.sort_layer_up_action,"Use this button to move the last selected image to the top layer.",LAYER_PREFERENCES_KEY);
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     }
