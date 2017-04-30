@@ -260,7 +260,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     private void colorButtonPressed() {
         ColorPickerDialogBuilder
                 .with(MainActivity.this)
-                .setTitle("Choose color")
+                .setTitle("Choose background color")
                 .initialColor(Color.WHITE)
                 .wheelType(ColorPickerView.WHEEL_TYPE.FLOWER)
                 .noSliders()

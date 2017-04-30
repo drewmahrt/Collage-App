@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Collage App</string>
+    <string name="app_name">Collage Creator</string>
     <string name="save_action_title">Save Image</string>
     <string name="delete_action_title">Delete Latest Image</string>
     <string name="zoom_in_action_title">Zoom In</string>
