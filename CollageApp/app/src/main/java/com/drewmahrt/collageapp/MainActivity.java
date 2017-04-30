@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.OnScaleGestureListener() {
             @Override
             public void onScaleEnd(ScaleGestureDetector detector) {
-                isScaling = false;
+                //isScaling = false;
             }
             @Override
             public boolean onScaleBegin(ScaleGestureDetector detector) {
@@ -237,7 +237,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
 
         if(motionEvent.getPointerCount() > 1 && touchedId != -1){
             mScaleDetector.onTouchEvent(motionEvent);
-        } else if(!isScaling && (touchedId == view.getId() || touchedId == -1)) {
+        } else if(touchedId == view.getId() || touchedId == -1) {
             view.requestFocus();
             view.requestFocusFromTouch();
             switch (motionEvent.getAction() & MotionEvent.ACTION_MASK) {
@@ -249,17 +249,20 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                     break;
 
                 case MotionEvent.ACTION_MOVE:
-                    int delta_x = (int) motionEvent.getX() - mStartX;
-                    int delta_y = (int) motionEvent.getY() - mStartY;
-                    layoutParams.leftMargin = layoutParams.leftMargin + delta_x;
-                    layoutParams.rightMargin = layoutParams.rightMargin - delta_x;
-                    layoutParams.topMargin = layoutParams.topMargin + delta_y;
-                    layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y;
-                    view.setLayoutParams(layoutParams);
+                    if(!isScaling) {
+                        int delta_x = (int) motionEvent.getX() - mStartX;
+                        int delta_y = (int) motionEvent.getY() - mStartY;
+                        layoutParams.leftMargin = layoutParams.leftMargin + delta_x;
+                        layoutParams.rightMargin = layoutParams.rightMargin - delta_x;
+                        layoutParams.topMargin = layoutParams.topMargin + delta_y;
+                        layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y;
+                        view.setLayoutParams(layoutParams);
+                    }
                     break;
 
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
+                    isScaling = false;
                     touchedId = -1;
                     break;
             }
