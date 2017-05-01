@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.OnScaleGestureListener() {
             @Override
             public void onScaleEnd(ScaleGestureDetector detector) {
-                //isScaling = false;
+                
             }
             @Override
             public boolean onScaleBegin(ScaleGestureDetector detector) {
@@ -249,6 +249,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                     break;
 
                 case MotionEvent.ACTION_MOVE:
+                    //only allow moving if all fingers have been removed from a previous scaling action
                     if(!isScaling) {
                         int delta_x = (int) motionEvent.getX() - mStartX;
                         int delta_y = (int) motionEvent.getY() - mStartY;
@@ -262,6 +263,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
 
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
+                    //set scaling flag to false since all fingers have been removed.
                     isScaling = false;
                     touchedId = -1;
                     break;
