@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     private SharedPreferences mPreferences;
 
     private FloatingActionButton mAddImageButton;
-    private MenuItem mDeleteButton, mSaveButton, mSortUpButton, mChooseColorButton;
+    private MenuItem mDeleteButton, mSaveButton, mSortUpButton, mChooseColorButton, mRotateLeftButton, mRotateRightButton;
     private FrameLayout mCollageContainer;
 
     private ScaleGestureDetector mScaleDetector;
@@ -84,6 +84,8 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mSaveButton = bottomMenu.findItem(R.id.save_action);
         mSortUpButton = bottomMenu.findItem(R.id.sort_layer_up_action);
         mChooseColorButton = bottomMenu.findItem(R.id.pick_color_action);
+        mRotateLeftButton = bottomMenu.findItem(R.id.rotate_left_action);
+        mRotateRightButton = bottomMenu.findItem(R.id.rotate_right_action);
         mCollageContainer = (FrameLayout)findViewById(R.id.collage_container);
 
         mCollageContainer.setOnTouchListener(this);
@@ -107,6 +109,8 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         mChooseColorButton.setOnMenuItemClickListener(this);
         mSortUpButton.setOnMenuItemClickListener(this);
         mDeleteButton.setOnMenuItemClickListener(this);
+        mRotateRightButton.setOnMenuItemClickListener(this);
+        mRotateLeftButton.setOnMenuItemClickListener(this);
 
         setupScaleDetector();
 
@@ -392,8 +396,22 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
             case R.id.save_action:
                 ImageUtility.saveCollage(this,mCollageContainer);
                 break;
+            case R.id.rotate_left_action:
+                rotateImage(-30);
+                break;
+            case R.id.rotate_right_action:
+                rotateImage(30);
+                break;
         }
         return true;
+    }
+
+    private void rotateImage(float i) {
+        View image = mCollageContainer.getFocusedChild();
+        if(image != null) {
+            Log.d(TAG, "rotateImage: current: " + image.getRotation() + " delta: " + i);
+            image.setRotation(image.getRotation() + i);
+        }
     }
 
     private void deleteSelectedImage(){
