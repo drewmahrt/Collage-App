@@ -173,35 +173,9 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 View image = mCollageContainer.getFocusedChild();
 
                 float scale = Math.max(0.95f,Math.min(detector.getScaleFactor(),1.1f));
-                //mScaleFactor *= Math.max(0.95f,Math.min(scale,1.1f));
                 CollageImage currentImage = mCollageImages.get(touchedIndex);
                 currentImage.setScale(currentImage.getScale()*scale);
 
-//                float height = image.getHeight() * scale;
-//                float width = image.getWidth() * scale;
-//
-//                if(Math.abs(image.getHeight()-height) > 10){
-//                    if(image.getHeight() - height < 0){
-//                        //image scaled up, but too fast
-//                        height = image.getHeight() + 10;
-//                    }else {
-//                        height = image.getHeight() - 10;
-//
-//                    }
-//                }
-//
-//                if(Math.abs(image.getWidth()-width) > 10){
-//                    if(image.getWidth() - width < 0){
-//                        //image scaled up, but too fast
-//                        width = image.getWidth() + 10;
-//                    }else {
-//                        width = image.getWidth() - 10;
-//
-//                    }
-//                }
-
-//                image.setMinimumHeight((int)height);
-//                image.setMinimumWidth((int)width);
                 image.setScaleX(currentImage.getScale());
                 image.setScaleY(currentImage.getScale());
 
@@ -289,30 +263,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         }
 
         mCollageContainer.invalidate();
-//        switch (motionEvent.getAction() & MotionEvent.ACTION_MASK){
-//            case MotionEvent.ACTION_DOWN:
-//            case MotionEvent.ACTION_POINTER_DOWN:
-//                if(motionEvent.getPointerCount() == 1) {
-//                    ((MoveableImageView) view).setActiveImage(true);
-//                    view.onTouchEvent(motionEvent);
-//                    view.setBackgroundResource(R.drawable.selected_border);
-//                }
-//                break;
-//
-//            case MotionEvent.ACTION_MOVE:
-//                if(((MoveableImageView)view).isActiveImage())
-//                    view.onTouchEvent(motionEvent);
-//                break;
-//
-//            case MotionEvent.ACTION_UP:
-//            case MotionEvent.ACTION_POINTER_UP:
-//                if(motionEvent.getPointerCount() == 1) {
-//                    ((MoveableImageView) view).setActiveImage(false);
-//                    view.onTouchEvent(motionEvent);
-//                    view.setBackgroundResource(R.drawable.unselected_border);
-//                }
-//                    break;
-//        }
+
         return true;
     }
 
@@ -346,9 +297,6 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         newImage.setId(View.generateViewId());
                         newImage.requestFocus();
                         newImage.requestFocusFromTouch();
-
-//                        MoveableImageView newImage = new MoveableImageView(this, selectedImage);
-//                        newImage.setLayoutParams(layoutParams);
                         newImage.setOnTouchListener(this);
                         mCollageContainer.addView(newImage);
                         mCollageImages.add(new CollageImage(selectedImage.getWidth(),selectedImage.getHeight(),imageUri,newImage.getId()));
