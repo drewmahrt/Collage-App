@@ -4,6 +4,7 @@ import android.net.Uri;
 
 public class CollageImage {
     private float mWidth, mHeight;
+    private float mScale;
     private int mId;
     private Uri mImageUri;
 
@@ -12,6 +13,15 @@ public class CollageImage {
         mHeight = height;
         mImageUri = imageUri;
         mId = id;
+        mScale = 1f;
+    }
+
+    public float getScale() {
+        return mScale;
+    }
+
+    public void setScale(float scale) {
+        mScale = scale;
     }
 
     public float getWidth() {

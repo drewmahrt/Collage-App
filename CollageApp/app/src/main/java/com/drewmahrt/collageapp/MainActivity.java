@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -34,7 +35,6 @@ import com.flask.colorpicker.builder.ColorPickerDialogBuilder;
 import com.getkeepsafe.taptargetview.TapTarget;
 import com.getkeepsafe.taptargetview.TapTargetView;
 
-
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -44,6 +44,8 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     private static final String TAG = "CollageActivity";
     private static final int PICTURE_GALLERY = 1;
     private static final int STORAGE_PERMISSION = 0;
+
+    private float mScaleFactor = 1.f;
 
     private static final String ADD_PREFERENCES_KEY = "add_tutorial";
     private static final String BACKGROUND_PREFERENCES_KEY = "background_tutorial";
@@ -58,6 +60,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
     private ScaleGestureDetector mScaleDetector;
     private boolean isScaling;
     private int touchedId;
+    private int touchedIndex;
 
     private List<CollageImage> mCollageImages;
 
@@ -87,6 +90,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
 
         isScaling = false;
         touchedId = -1;
+        touchedIndex = -1;
 
         //Fix to bring FAB on top for 4.x devices
         mAddImageButton.bringToFront();
@@ -110,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         if(!mPreferences.getBoolean(ADD_PREFERENCES_KEY,false))
             triggerIntroShowcase(R.id.addFab,"Tap here to add you first photo!",ADD_PREFERENCES_KEY);
     }
+
 
     private void startPhotoPicker() {
         Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
@@ -167,40 +172,50 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
             public boolean onScale(ScaleGestureDetector detector) {
                 View image = mCollageContainer.getFocusedChild();
 
-                float scale = detector.getScaleFactor();
-                if(scale < 1)
-                    scale = 0.95f;
-                else
-                    scale = 1.05f;
+                float scale = Math.max(0.95f,Math.min(detector.getScaleFactor(),1.1f));
+                //mScaleFactor *= Math.max(0.95f,Math.min(scale,1.1f));
+                CollageImage currentImage = mCollageImages.get(touchedIndex);
+                currentImage.setScale(currentImage.getScale()*scale);
 
-                float height = image.getHeight() * scale;
-                float width = image.getWidth() * scale;
+//                float height = image.getHeight() * scale;
+//                float width = image.getWidth() * scale;
+//
+//                if(Math.abs(image.getHeight()-height) > 10){
+//                    if(image.getHeight() - height < 0){
+//                        //image scaled up, but too fast
+//                        height = image.getHeight() + 10;
+//                    }else {
+//                        height = image.getHeight() - 10;
+//
+//                    }
+//                }
+//
+//                if(Math.abs(image.getWidth()-width) > 10){
+//                    if(image.getWidth() - width < 0){
+//                        //image scaled up, but too fast
+//                        width = image.getWidth() + 10;
+//                    }else {
+//                        width = image.getWidth() - 10;
+//
+//                    }
+//                }
 
-                if(Math.abs(image.getHeight()-height) > 10){
-                    if(image.getHeight() - height < 0){
-                        //image scaled up, but too fast
-                        height = image.getHeight() + 10;
-                    }else {
-                        height = image.getHeight() - 10;
+//                image.setMinimumHeight((int)height);
+//                image.setMinimumWidth((int)width);
+                image.setScaleX(currentImage.getScale());
+                image.setScaleY(currentImage.getScale());
 
-                    }
-                }
-
-                if(Math.abs(image.getWidth()-width) > 10){
-                    if(image.getWidth() - width < 0){
-                        //image scaled up, but too fast
-                        width = image.getWidth() + 10;
-                    }else {
-                        width = image.getWidth() - 10;
-
-                    }
-                }
-
-                image.setMinimumHeight((int)height);
-                image.setMinimumWidth((int)width);
                 return false;
+
             }
         });
+
+        ScaleGestureDetector.SimpleOnScaleGestureListener listener = new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+            @Override
+            public boolean onScale(ScaleGestureDetector detector) {
+                return super.onScale(detector);
+            }
+        };
     }
 
     public Uri addImageToGallery(Context context, String title, String description) {
@@ -232,6 +247,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
         if(view.getId() == R.id.collage_container)
             return false;
 
+
         FrameLayout.LayoutParams layoutParams =
                 (FrameLayout.LayoutParams) view.getLayoutParams();
 
@@ -244,6 +260,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN:
                     touchedId = view.getId();
+                    touchedIndex = findCollageIndex(touchedId);
                     mStartX = (int) motionEvent.getX();
                     mStartY = (int) motionEvent.getY();
                     break;
@@ -266,15 +283,46 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                     //set scaling flag to false since all fingers have been removed.
                     isScaling = false;
                     touchedId = -1;
+                    touchedIndex = -1;
                     break;
             }
         }
 
         mCollageContainer.invalidate();
+//        switch (motionEvent.getAction() & MotionEvent.ACTION_MASK){
+//            case MotionEvent.ACTION_DOWN:
+//            case MotionEvent.ACTION_POINTER_DOWN:
+//                if(motionEvent.getPointerCount() == 1) {
+//                    ((MoveableImageView) view).setActiveImage(true);
+//                    view.onTouchEvent(motionEvent);
+//                    view.setBackgroundResource(R.drawable.selected_border);
+//                }
+//                break;
+//
+//            case MotionEvent.ACTION_MOVE:
+//                if(((MoveableImageView)view).isActiveImage())
+//                    view.onTouchEvent(motionEvent);
+//                break;
+//
+//            case MotionEvent.ACTION_UP:
+//            case MotionEvent.ACTION_POINTER_UP:
+//                if(motionEvent.getPointerCount() == 1) {
+//                    ((MoveableImageView) view).setActiveImage(false);
+//                    view.onTouchEvent(motionEvent);
+//                    view.setBackgroundResource(R.drawable.unselected_border);
+//                }
+//                    break;
+//        }
         return true;
     }
 
-
+    private int findCollageIndex(int touchedId) {
+        for (int i = 0; i < mCollageImages.size(); i++) {
+            if(touchedId == mCollageImages.get(i).getId())
+                return i;
+        }
+        return -1;
+    }
 
 
     @Override
@@ -286,7 +334,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         Uri imageUri = data.getData();
                         InputStream imageStream = getContentResolver().openInputStream(imageUri);
                         Bitmap selectedImage = BitmapFactory.decodeStream(imageStream);
-                        selectedImage = ImageUtility.getResizedBitmap(selectedImage, 500);// 400 is for example, replace with desired size
+                        selectedImage = ImageUtility.getResizedBitmap(selectedImage, 600);
                         ImageView newImage = new ImageView(this);
                         ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
                         newImage.setLayoutParams(layoutParams);
@@ -298,8 +346,16 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                         newImage.setId(View.generateViewId());
                         newImage.requestFocus();
                         newImage.requestFocusFromTouch();
+
+//                        MoveableImageView newImage = new MoveableImageView(this, selectedImage);
+//                        newImage.setLayoutParams(layoutParams);
+                        newImage.setOnTouchListener(this);
                         mCollageContainer.addView(newImage);
                         mCollageImages.add(new CollageImage(selectedImage.getWidth(),selectedImage.getHeight(),imageUri,newImage.getId()));
+
+
+                        //reset image scale factor for new image
+                        mScaleFactor = 1f;
 
                         //If first time adding a picture, show background color tutorial
                         if(!mPreferences.getBoolean(BACKGROUND_PREFERENCES_KEY,false))
