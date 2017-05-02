@@ -370,7 +370,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 
-                    ImageUtility.saveCollage(this,mCollageContainer);
+                    ImageUtility.saveCollage(this,mCollageContainer,findViewById(R.id.progress_bar));
                 } else {
 
                     Toast.makeText(this, "Images cannot be saved without storage access", Toast.LENGTH_SHORT).show();
@@ -394,7 +394,7 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 colorButtonPressed();
                 break;
             case R.id.save_action:
-                ImageUtility.saveCollage(this,mCollageContainer);
+                ImageUtility.saveCollage(this,mCollageContainer,findViewById(R.id.progress_bar));
                 break;
             case R.id.rotate_left_action:
                 rotateImage(-30);
