@@ -12,4 +12,3 @@ Collage Creator provides you with the tools to create beautiful collages quickly
 
 **Todo:**
 - Add rotation gesture in place of rotation buttons
-
