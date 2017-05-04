@@ -397,10 +397,10 @@ public class MainActivity extends AppCompatActivity implements View.OnTouchListe
                 ImageUtility.saveCollage(this,mCollageContainer,findViewById(R.id.progress_bar));
                 break;
             case R.id.rotate_left_action:
-                rotateImage(-30);
+                rotateImage(-10);
                 break;
             case R.id.rotate_right_action:
-                rotateImage(30);
+                rotateImage(10);
                 break;
         }
         return true;
