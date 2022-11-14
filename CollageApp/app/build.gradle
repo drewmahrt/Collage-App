@@ -9,8 +9,8 @@ android {
         applicationId "com.drewmahrt.collageapp"
         minSdk 29
         targetSdk 32
-        versionCode 1
-        versionName "1.0"
+        versionCode 4
+        versionName "1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
