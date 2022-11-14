@@ -3,7 +3,10 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/CollageApp.iml" filepath="$PROJECT_DIR$/CollageApp.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.androidTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.main.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.unitTest.iml" />
     </modules>
   </component>
 </project>

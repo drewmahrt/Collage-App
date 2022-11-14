@@ -1,0 +1,1574 @@
+Index: app/src/main/java/com/drewmahrt/collageapp/MainActivity.java
+===================================================================
+diff --git a/app/src/main/java/com/drewmahrt/collageapp/MainActivity.java b/app/src/main/java/com/drewmahrt/collageapp/MainActivity.java
+deleted file mode 100644
+--- a/app/src/main/java/com/drewmahrt/collageapp/MainActivity.java	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ /dev/null	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
+@@ -1,423 +0,0 @@
+-package com.drewmahrt.collageapp;
+-
+-import android.content.ContentValues;
+-import android.content.Context;
+-import android.content.DialogInterface;
+-import android.content.Intent;
+-import android.content.SharedPreferences;
+-import android.content.pm.PackageManager;
+-import android.graphics.Bitmap;
+-import android.graphics.BitmapFactory;
+-import android.graphics.Color;
+-import android.graphics.drawable.BitmapDrawable;
+-import android.net.Uri;
+-import android.os.Bundle;
+-import android.provider.MediaStore;
+-import android.support.design.widget.FloatingActionButton;
+-import android.support.v7.app.AlertDialog;
+-import android.support.v7.app.AppCompatActivity;
+-import android.support.v7.widget.ActionMenuView;
+-import android.util.Log;
+-import android.view.Menu;
+-import android.view.MenuItem;
+-import android.view.MotionEvent;
+-import android.view.ScaleGestureDetector;
+-import android.view.View;
+-import android.view.ViewGroup;
+-import android.widget.FrameLayout;
+-import android.widget.ImageView;
+-import android.widget.Toast;
+-
+-import com.flask.colorpicker.ColorPickerView;
+-import com.flask.colorpicker.OnColorSelectedListener;
+-import com.flask.colorpicker.builder.ColorPickerClickListener;
+-import com.flask.colorpicker.builder.ColorPickerDialogBuilder;
+-import com.getkeepsafe.taptargetview.TapTarget;
+-import com.getkeepsafe.taptargetview.TapTargetView;
+-
+-import java.io.FileNotFoundException;
+-import java.io.InputStream;
+-import java.util.ArrayList;
+-import java.util.List;
+-
+-public class MainActivity extends AppCompatActivity implements View.OnTouchListener, MenuItem.OnMenuItemClickListener, View.OnFocusChangeListener {
+-    private static final String TAG = "CollageActivity";
+-    private static final int PICTURE_GALLERY = 1;
+-    private static final int STORAGE_PERMISSION = 0;
+-
+-    private float mScaleFactor = 1.f;
+-
+-    private static final String ADD_PREFERENCES_KEY = "add_tutorial";
+-    private static final String BACKGROUND_PREFERENCES_KEY = "background_tutorial";
+-    private static final String LAYER_PREFERENCES_KEY = "layer_tutorial";
+-
+-    private SharedPreferences mPreferences;
+-
+-    private FloatingActionButton mAddImageButton;
+-    private MenuItem mDeleteButton, mSaveButton, mSortUpButton, mChooseColorButton;
+-    private FrameLayout mCollageContainer;
+-
+-    private ScaleGestureDetector mScaleDetector;
+-    private boolean isScaling;
+-    private int touchedId;
+-    private int touchedIndex;
+-
+-    private List<CollageImage> mCollageImages;
+-
+-    private int mStartX, mStartY;
+-
+-    @Override
+-    protected void onCreate(Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
+-        setContentView(R.layout.collage_creator);
+-
+-        mPreferences = getPreferences(MODE_PRIVATE);
+-
+-        ActionMenuView bottomBar = (ActionMenuView)findViewById(R.id.amvMenu);
+-        Menu bottomMenu = bottomBar.getMenu();
+-        getMenuInflater().inflate(R.menu.collage_menu,bottomMenu);
+-
+-        mCollageImages = new ArrayList<>();
+-
+-        mAddImageButton = (FloatingActionButton)findViewById(R.id.addFab);
+-        mDeleteButton = bottomMenu.findItem(R.id.delete_image_action);
+-        mSaveButton = bottomMenu.findItem(R.id.save_action);
+-        mSortUpButton = bottomMenu.findItem(R.id.sort_layer_up_action);
+-        mChooseColorButton = bottomMenu.findItem(R.id.pick_color_action);
+-        mCollageContainer = (FrameLayout)findViewById(R.id.collage_container);
+-
+-        mCollageContainer.setOnTouchListener(this);
+-
+-        isScaling = false;
+-        touchedId = -1;
+-        touchedIndex = -1;
+-
+-        //Fix to bring FAB on top for 4.x devices
+-        mAddImageButton.bringToFront();
+-        restoreFullScreen();
+-
+-        mAddImageButton.setOnClickListener(new View.OnClickListener() {
+-            @Override
+-            public void onClick(View v) {
+-                startPhotoPicker();
+-            }
+-        });
+-
+-        mSaveButton.setOnMenuItemClickListener(this);
+-        mChooseColorButton.setOnMenuItemClickListener(this);
+-        mSortUpButton.setOnMenuItemClickListener(this);
+-        mDeleteButton.setOnMenuItemClickListener(this);
+-
+-        setupScaleDetector();
+-
+-        //If first time launching, show add picture tutorial
+-        if(!mPreferences.getBoolean(ADD_PREFERENCES_KEY,false))
+-            triggerIntroShowcase(R.id.addFab,"Tap here to add you first photo!",ADD_PREFERENCES_KEY);
+-    }
+-
+-
+-    private void startPhotoPicker() {
+-        Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
+-        photoPickerIntent.setType("image/*");
+-        startActivityForResult(photoPickerIntent, PICTURE_GALLERY);
+-    }
+-
+-    private void triggerIntroShowcase(final int id, String message, final String preferencesKey) {
+-        TapTargetView.showFor(this,
+-                TapTarget.forView(findViewById(id),message)
+-                .transparentTarget(true)
+-                .cancelable(false),
+-                new TapTargetView.Listener(){
+-                    @Override
+-                    public void onTargetClick(TapTargetView view) {
+-                        mPreferences.edit().putBoolean(preferencesKey,true).apply();
+-                        view.dismiss(true);
+-
+-                        switch (id){
+-                            case R.id.addFab:
+-                                startPhotoPicker();
+-                                break;
+-                            case R.id.pick_color_action:
+-                                colorButtonPressed();
+-                                break;
+-                            case R.id.sort_layer_up_action:
+-                                bringToFront();
+-                                break;
+-                        }
+-                    }
+-                }
+-        );
+-    }
+-
+-
+-
+-    @Override
+-    protected void onResume() {
+-        super.onResume();
+-        restoreFullScreen();
+-    }
+-
+-    private void setupScaleDetector() {
+-        mScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.OnScaleGestureListener() {
+-            @Override
+-            public void onScaleEnd(ScaleGestureDetector detector) {
+-                
+-            }
+-            @Override
+-            public boolean onScaleBegin(ScaleGestureDetector detector) {
+-                isScaling = true;
+-                return true;
+-            }
+-            @Override
+-            public boolean onScale(ScaleGestureDetector detector) {
+-                View image = mCollageContainer.getFocusedChild();
+-
+-                float scale = Math.max(0.95f,Math.min(detector.getScaleFactor(),1.1f));
+-                CollageImage currentImage = mCollageImages.get(touchedIndex);
+-                currentImage.setScale(currentImage.getScale()*scale);
+-
+-                image.setScaleX(currentImage.getScale());
+-                image.setScaleY(currentImage.getScale());
+-
+-                return false;
+-
+-            }
+-        });
+-
+-        ScaleGestureDetector.SimpleOnScaleGestureListener listener = new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+-            @Override
+-            public boolean onScale(ScaleGestureDetector detector) {
+-                return super.onScale(detector);
+-            }
+-        };
+-    }
+-
+-    public Uri addImageToGallery(Context context, String title, String description) {
+-        ContentValues values = new ContentValues();
+-        values.put(MediaStore.Images.Media.TITLE, title);
+-        values.put(MediaStore.Images.Media.DESCRIPTION, description);
+-        values.put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis());
+-        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+-
+-        return context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+-    }
+-
+-    private void bringToFront(){
+-        if(mCollageContainer.getFocusedChild() != null) {
+-            mCollageContainer.getFocusedChild().bringToFront();
+-        }
+-    }
+-
+-    @Override
+-    public boolean onCreateOptionsMenu(Menu menu) {
+-        getMenuInflater().inflate(R.menu.collage_menu, menu);
+-        return super.onCreateOptionsMenu(menu);
+-    }
+-
+-    @Override
+-    public boolean onTouch(View view, MotionEvent motionEvent) {
+-
+-        //Check for touching background of canvas which causes ClassCastException for RelativeLayout to FrameLayout
+-        if(view.getId() == R.id.collage_container)
+-            return false;
+-
+-
+-        FrameLayout.LayoutParams layoutParams =
+-                (FrameLayout.LayoutParams) view.getLayoutParams();
+-
+-        if(motionEvent.getPointerCount() > 1 && touchedId != -1){
+-            mScaleDetector.onTouchEvent(motionEvent);
+-        } else if(touchedId == view.getId() || touchedId == -1) {
+-            view.requestFocus();
+-            view.requestFocusFromTouch();
+-            switch (motionEvent.getAction() & MotionEvent.ACTION_MASK) {
+-                case MotionEvent.ACTION_DOWN:
+-                case MotionEvent.ACTION_POINTER_DOWN:
+-                    touchedId = view.getId();
+-                    touchedIndex = findCollageIndex(touchedId);
+-                    mStartX = (int) motionEvent.getX();
+-                    mStartY = (int) motionEvent.getY();
+-                    break;
+-
+-                case MotionEvent.ACTION_MOVE:
+-                    //only allow moving if all fingers have been removed from a previous scaling action
+-                    if(!isScaling) {
+-                        int delta_x = (int) motionEvent.getX() - mStartX;
+-                        int delta_y = (int) motionEvent.getY() - mStartY;
+-                        layoutParams.leftMargin = layoutParams.leftMargin + delta_x;
+-                        layoutParams.rightMargin = layoutParams.rightMargin - delta_x;
+-                        layoutParams.topMargin = layoutParams.topMargin + delta_y;
+-                        layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y;
+-                        view.setLayoutParams(layoutParams);
+-                    }
+-                    break;
+-
+-                case MotionEvent.ACTION_UP:
+-                case MotionEvent.ACTION_POINTER_UP:
+-                    //set scaling flag to false since all fingers have been removed.
+-                    isScaling = false;
+-                    touchedId = -1;
+-                    touchedIndex = -1;
+-                    break;
+-            }
+-        }
+-
+-        mCollageContainer.invalidate();
+-
+-        return true;
+-    }
+-
+-    private int findCollageIndex(int touchedId) {
+-        for (int i = 0; i < mCollageImages.size(); i++) {
+-            if(touchedId == mCollageImages.get(i).getId())
+-                return i;
+-        }
+-        return -1;
+-    }
+-
+-
+-    @Override
+-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+-        switch (requestCode){
+-            case PICTURE_GALLERY:
+-                if (resultCode == RESULT_OK) {
+-                    try {
+-                        Uri imageUri = data.getData();
+-                        InputStream imageStream = getContentResolver().openInputStream(imageUri);
+-                        Bitmap selectedImage = BitmapFactory.decodeStream(imageStream);
+-                        selectedImage = ImageUtility.getResizedBitmap(selectedImage, 600);
+-                        ImageView newImage = new ImageView(this);
+-                        ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+-                        newImage.setLayoutParams(layoutParams);
+-                        newImage.setImageBitmap(selectedImage);
+-                        newImage.setFocusableInTouchMode(true);
+-                        newImage.setFocusable(true);
+-                        newImage.setOnTouchListener(this);
+-                        newImage.setOnFocusChangeListener(this);
+-                        newImage.setId(View.generateViewId());
+-                        newImage.requestFocus();
+-                        newImage.requestFocusFromTouch();
+-                        newImage.setOnTouchListener(this);
+-                        mCollageContainer.addView(newImage);
+-                        mCollageImages.add(new CollageImage(selectedImage.getWidth(),selectedImage.getHeight(),imageUri,newImage.getId()));
+-
+-
+-                        //reset image scale factor for new image
+-                        mScaleFactor = 1f;
+-
+-                        //If first time adding a picture, show background color tutorial
+-                        if(!mPreferences.getBoolean(BACKGROUND_PREFERENCES_KEY,false))
+-                            triggerIntroShowcase(R.id.pick_color_action,"Tap here to choose your background color.",BACKGROUND_PREFERENCES_KEY);
+-
+-                        //If first time with two pictures, show layer button tutorial
+-                        if(mCollageImages.size() > 1 && !mPreferences.getBoolean(LAYER_PREFERENCES_KEY,false))
+-                            triggerIntroShowcase(R.id.sort_layer_up_action,"Use this button to move the last selected image to the top layer.",LAYER_PREFERENCES_KEY);
+-                    } catch (FileNotFoundException e) {
+-                        e.printStackTrace();
+-                    }
+-                }
+-        }
+-
+-        restoreFullScreen();
+-    }
+-
+-
+-
+-    private void colorButtonPressed() {
+-        ColorPickerDialogBuilder
+-                .with(MainActivity.this)
+-                .setTitle("Choose background color")
+-                .initialColor(Color.WHITE)
+-                .wheelType(ColorPickerView.WHEEL_TYPE.FLOWER)
+-                .noSliders()
+-                .density(12)
+-                .setOnColorSelectedListener(new OnColorSelectedListener() {
+-                    @Override
+-                    public void onColorSelected(int selectedColor) {
+-
+-                    }
+-                })
+-                .setPositiveButton("ok", new ColorPickerClickListener() {
+-                    @Override
+-                    public void onClick(DialogInterface dialog, int selectedColor, Integer[] allColors) {
+-                        mCollageContainer.setBackgroundColor(selectedColor);
+-                        dialog.dismiss();
+-                        mCollageContainer.invalidate();
+-                        restoreFullScreen();
+-                    }
+-                })
+-                .setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+-                    @Override
+-                    public void onClick(DialogInterface dialog, int which) {
+-                        dialog.dismiss();
+-                        restoreFullScreen();
+-                    }
+-                })
+-                .build()
+-                .show();
+-    }
+-
+-    @Override
+-    public void onRequestPermissionsResult(int requestCode,
+-                                           String permissions[], int[] grantResults) {
+-        switch (requestCode) {
+-            case STORAGE_PERMISSION: {
+-                // If request is cancelled, the result arrays are empty.
+-                if (grantResults.length > 0
+-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+-
+-                    ImageUtility.saveCollage(this,mCollageContainer);
+-                } else {
+-
+-                    Toast.makeText(this, "Images cannot be saved without storage access", Toast.LENGTH_SHORT).show();
+-                }
+-            }
+-            break;
+-        }
+-        restoreFullScreen();
+-    }
+-
+-    @Override
+-    public boolean onMenuItemClick(MenuItem item) {
+-        switch (item.getItemId()){
+-            case R.id.sort_layer_up_action:
+-                bringToFront();
+-                break;
+-            case R.id.delete_image_action:
+-                deleteSelectedImage();
+-                break;
+-            case R.id.pick_color_action:
+-                colorButtonPressed();
+-                break;
+-            case R.id.save_action:
+-                ImageUtility.saveCollage(this,mCollageContainer);
+-                break;
+-        }
+-        return true;
+-    }
+-
+-    private void deleteSelectedImage(){
+-        if(mCollageContainer.getFocusedChild() != null){
+-            mCollageContainer.removeView(mCollageContainer.getFocusedChild());
+-        }
+-    }
+-
+-    @Override
+-    public void onFocusChange(View v, boolean hasFocus) {
+-        if(hasFocus){
+-            v.setBackgroundResource(R.drawable.selected_border);
+-        } else {
+-            v.setBackgroundResource(R.drawable.unselected_border);
+-        }
+-    }
+-
+-    private void restoreFullScreen(){
+-        getWindow().getDecorView().setSystemUiVisibility(
+-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+-                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+-    }
+-}
+Index: app/src/main/java/com/drewmahrt/collageapp/ImageUtility.java
+===================================================================
+diff --git a/app/src/main/java/com/drewmahrt/collageapp/ImageUtility.java b/app/src/main/java/com/drewmahrt/collageapp/ImageUtility.java
+deleted file mode 100644
+--- a/app/src/main/java/com/drewmahrt/collageapp/ImageUtility.java	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ /dev/null	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
+@@ -1,85 +0,0 @@
+-package com.drewmahrt.collageapp;
+-
+-import android.Manifest;
+-import android.content.pm.PackageManager;
+-import android.graphics.Bitmap;
+-import android.graphics.Canvas;
+-import android.os.Environment;
+-import android.provider.MediaStore;
+-import android.support.v4.app.ActivityCompat;
+-import android.support.v4.content.ContextCompat;
+-import android.support.v7.app.AppCompatActivity;
+-import android.view.View;
+-import android.widget.FrameLayout;
+-import android.widget.Toast;
+-
+-import java.io.File;
+-import java.io.FileNotFoundException;
+-import java.io.FileOutputStream;
+-import java.io.IOException;
+-import java.io.OutputStream;
+-
+-
+-public class ImageUtility {
+-    public static Bitmap getResizedBitmap(Bitmap image, int maxSize) {
+-        int width = image.getWidth();
+-        int height = image.getHeight();
+-
+-        float bitmapRatio = (float)width / (float) height;
+-        if (bitmapRatio > 1) {
+-            width = maxSize;
+-            height = (int) (width / bitmapRatio);
+-        } else {
+-            height = maxSize;
+-            width = (int) (height * bitmapRatio);
+-        }
+-        return Bitmap.createScaledBitmap(image, width, height, true);
+-    }
+-
+-    public static void saveCollage(AppCompatActivity activity, FrameLayout collageContainer){
+-
+-
+-        if (ContextCompat.checkSelfPermission(activity,
+-                Manifest.permission.WRITE_EXTERNAL_STORAGE)
+-                != PackageManager.PERMISSION_GRANTED) {
+-
+-            ActivityCompat.requestPermissions(activity,
+-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+-                    0);
+-        }else {
+-
+-            //remove selected image border
+-            if(collageContainer.getFocusedChild() != null) {
+-                collageContainer.getFocusedChild().setBackgroundResource(R.drawable.unselected_border);
+-            }
+-
+-            //Find the view we are after
+-            View view = (View) activity.findViewById(R.id.collage_container);
+-            //Create a Bitmap with the same dimensions
+-            Bitmap image = Bitmap.createBitmap(collageContainer.getWidth(),
+-                    view.getHeight(),
+-                    Bitmap.Config.RGB_565);
+-            //Draw the view inside the Bitmap
+-            Canvas testcanvas = new Canvas();
+-            view.draw(new Canvas(image));
+-
+-            //TODO: Make the pictures save in the correct folder
+-            String path = Environment.getExternalStorageDirectory().toString();
+-            OutputStream fOut = null;
+-            File file = new File(path, "collage" + System.currentTimeMillis() + ".png"); // the File to save to
+-            try {
+-                fOut = new FileOutputStream(file);
+-                image.compress(Bitmap.CompressFormat.PNG, 100, fOut); // saving the Bitmap to a file compressed as a JPEG with 90% compression rate
+-                fOut.flush();
+-                fOut.close(); // do not forget to close the stream
+-
+-                MediaStore.Images.Media.insertImage(activity.getContentResolver(), file.getAbsolutePath(), file.getName(), file.getName());
+-                Toast.makeText(activity, "Collage saved!", Toast.LENGTH_SHORT).show();
+-            } catch (FileNotFoundException e) {
+-                e.printStackTrace();
+-            } catch (IOException e) {
+-                e.printStackTrace();
+-            }
+-        }
+-    }
+-}
+Index: .idea/runConfigurations.xml
+===================================================================
+diff --git a/.idea/runConfigurations.xml b/.idea/runConfigurations.xml
+deleted file mode 100644
+--- a/.idea/runConfigurations.xml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ /dev/null	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
+@@ -1,12 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project version="4">
+-  <component name="RunConfigurationProducerService">
+-    <option name="ignoredProducers">
+-      <set>
+-        <option value="org.jetbrains.plugins.gradle.execution.test.runner.AllInPackageGradleConfigurationProducer" />
+-        <option value="org.jetbrains.plugins.gradle.execution.test.runner.TestClassGradleConfigurationProducer" />
+-        <option value="org.jetbrains.plugins.gradle.execution.test.runner.TestMethodGradleConfigurationProducer" />
+-      </set>
+-    </option>
+-  </component>
+-</project>
+\ No newline at end of file
+Index: app/src/main/java/com/drewmahrt/collageapp/CollageImage.java
+===================================================================
+diff --git a/app/src/main/java/com/drewmahrt/collageapp/CollageImage.java b/app/src/main/java/com/drewmahrt/collageapp/CollageImage.java
+deleted file mode 100644
+--- a/app/src/main/java/com/drewmahrt/collageapp/CollageImage.java	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ /dev/null	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
+@@ -1,58 +0,0 @@
+-package com.drewmahrt.collageapp;
+-
+-import android.net.Uri;
+-
+-public class CollageImage {
+-    private float mWidth, mHeight;
+-    private float mScale;
+-    private int mId;
+-    private Uri mImageUri;
+-
+-    public CollageImage(float width, float height, Uri imageUri, int id) {
+-        mWidth = width;
+-        mHeight = height;
+-        mImageUri = imageUri;
+-        mId = id;
+-        mScale = 1f;
+-    }
+-
+-    public float getScale() {
+-        return mScale;
+-    }
+-
+-    public void setScale(float scale) {
+-        mScale = scale;
+-    }
+-
+-    public float getWidth() {
+-        return mWidth;
+-    }
+-
+-    public void setWidth(float width) {
+-        mWidth = width;
+-    }
+-
+-    public float getHeight() {
+-        return mHeight;
+-    }
+-
+-    public void setHeight(float height) {
+-        mHeight = height;
+-    }
+-
+-    public Uri getImageUri() {
+-        return mImageUri;
+-    }
+-
+-    public void setImageUri(Uri imageUri) {
+-        mImageUri = imageUri;
+-    }
+-
+-    public int getId() {
+-        return mId;
+-    }
+-
+-    public void setId(int id) {
+-        mId = id;
+-    }
+-}
+Index: .idea/gradle.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"GradleSettings\">\r\n    <option name=\"linkedExternalProjectsSettings\">\r\n      <GradleProjectSettings>\r\n        <option name=\"distributionType\" value=\"DEFAULT_WRAPPED\" />\r\n        <option name=\"externalProjectPath\" value=\"$PROJECT_DIR$\" />\r\n        <option name=\"modules\">\r\n          <set>\r\n            <option value=\"$PROJECT_DIR$\" />\r\n            <option value=\"$PROJECT_DIR$/app\" />\r\n          </set>\r\n        </option>\r\n        <option name=\"resolveModulePerSourceSet\" value=\"false\" />\r\n      </GradleProjectSettings>\r\n    </option>\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/gradle.xml b/.idea/gradle.xml
+--- a/.idea/gradle.xml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/.idea/gradle.xml	(date 1667943773227)
+@@ -1,8 +1,10 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project version="4">
++  <component name="GradleMigrationSettings" migrationVersion="1" />
+   <component name="GradleSettings">
+     <option name="linkedExternalProjectsSettings">
+       <GradleProjectSettings>
++        <option name="testRunner" value="GRADLE" />
+         <option name="distributionType" value="DEFAULT_WRAPPED" />
+         <option name="externalProjectPath" value="$PROJECT_DIR$" />
+         <option name="modules">
+@@ -11,7 +13,6 @@
+             <option value="$PROJECT_DIR$/app" />
+           </set>
+         </option>
+-        <option name="resolveModulePerSourceSet" value="false" />
+       </GradleProjectSettings>
+     </option>
+   </component>
+Index: .idea/deploymentTargetDropDown.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/deploymentTargetDropDown.xml b/.idea/deploymentTargetDropDown.xml
+new file mode 100644
+--- /dev/null	(date 1668459359520)
++++ b/.idea/deploymentTargetDropDown.xml	(date 1668459359520)
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="deploymentTargetDropDown">
++    <targetSelectedWithDropDown>
++      <Target>
++        <type value="QUICK_BOOT_TARGET" />
++        <deviceKey>
++          <Key>
++            <type value="VIRTUAL_DEVICE_PATH" />
++            <value value="C:\Users\Drew\.android\avd\Pixel_6_API_29.avd" />
++          </Key>
++        </deviceKey>
++      </Target>
++    </targetSelectedWithDropDown>
++    <timeTargetWasSelectedWithDropDown value="2022-11-14T20:52:16.405932500Z" />
++  </component>
++</project>
+\ No newline at end of file
+Index: app/src/main/AndroidManifest.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    package=\"com.drewmahrt.collageapp\" >\r\n\r\n    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>\r\n\r\n    <application\r\n        android:allowBackup=\"true\"\r\n        android:icon=\"@mipmap/ic_launcher\"\r\n        android:label=\"@string/app_name\"\r\n        android:theme=\"@style/AppTheme\" >\r\n        <activity\r\n            android:name=\".MainActivity\"\r\n            android:label=\"@string/app_name\"\r\n            android:screenOrientation=\"portrait\">\r\n            <intent-filter>\r\n                <action android:name=\"android.intent.action.MAIN\" />\r\n\r\n                <category android:name=\"android.intent.category.LAUNCHER\" />\r\n            </intent-filter>\r\n        </activity>\r\n    </application>\r\n\r\n</manifest>\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+--- a/app/src/main/AndroidManifest.xml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/app/src/main/AndroidManifest.xml	(date 1668458729555)
+@@ -1,8 +1,5 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="com.drewmahrt.collageapp" >
+-
+-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android" >
+ 
+     <application
+         android:allowBackup="true"
+@@ -10,9 +7,9 @@
+         android:label="@string/app_name"
+         android:theme="@style/AppTheme" >
+         <activity
+-            android:name=".MainActivity"
+-            android:label="@string/app_name"
+-            android:screenOrientation="portrait">
++            android:name=".CollageCreationActivity"
++            android:screenOrientation="portrait"
++            android:exported="true">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+ 
+Index: app/src/main/res/layout/collage_creator.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/res/layout/collage_creator.xml b/app/src/main/res/layout/activity_collage_creator.xml
+rename from app/src/main/res/layout/collage_creator.xml
+rename to app/src/main/res/layout/activity_collage_creator.xml
+--- a/app/src/main/res/layout/collage_creator.xml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/app/src/main/res/layout/activity_collage_creator.xml	(date 1668011107554)
+@@ -1,44 +1,47 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:id="@+id/frame"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
+     android:background="@color/default_background">
+ 
+-    <android.support.v7.widget.Toolbar
++    <androidx.appcompat.widget.Toolbar
+         android:id="@+id/toolbar_bottom"
+         android:minHeight="?android:attr/actionBarSize"
+         android:background="@color/toolbar_background"
+         android:popupTheme="@android:style/ThemeOverlay.Material.Light"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+-        android:layout_alignParentBottom="true">
++        app:layout_constraintBottom_toBottomOf="parent">
+ 
+-        <android.support.v7.widget.ActionMenuView
+-            android:id="@+id/amvMenu"
++        <androidx.appcompat.widget.ActionMenuView
++            android:id="@+id/action_menu_view"
+             android:layout_width="wrap_content"
+             android:layout_height="?attr/actionBarSize"/>
+-    </android.support.v7.widget.Toolbar>
++    </androidx.appcompat.widget.Toolbar>
+ 
+     <FrameLayout
+         android:id="@+id/collage_container"
+-        android:layout_width="match_parent"
+-        android:layout_height="match_parent"
+-        android:layout_marginBottom="?attr/actionBarSize"
++        android:layout_width="0dp"
++        android:layout_height="0dp"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        app:layout_constraintBottom_toTopOf="@id/toolbar_bottom"
+         android:background="#fff"/>
+ 
+-    <android.support.design.widget.FloatingActionButton
+-        android:id="@+id/addFab"
++    <com.google.android.material.floatingactionbutton.FloatingActionButton
++        android:id="@+id/add_fab"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:layout_alignParentBottom="true"
+-        android:layout_alignParentRight="true"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
+         android:layout_marginBottom="45dp"
+-        android:layout_marginRight="5dp"
++        android:layout_marginEnd="5dp"
+         android:src="@drawable/ic_add"
+         app:borderWidth="2dp"
+         app:fabSize="normal"
+         />
+ 
+-</RelativeLayout>
++</androidx.constraintlayout.widget.ConstraintLayout>
+Index: build.gradle
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>// Top-level build file where you can add configuration options common to all sub-projects/modules.\r\n\r\nbuildscript {\r\n    repositories {\r\n        jcenter()\r\n    }\r\n    dependencies {\r\n        classpath 'com.android.tools.build:gradle:2.3.0'\r\n\r\n        // NOTE: Do not place your application dependencies here; they belong\r\n        // in the individual module build.gradle files\r\n    }\r\n}\r\n\r\nallprojects {\r\n    repositories {\r\n        jcenter()\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/build.gradle b/build.gradle
+--- a/build.gradle	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/build.gradle	(date 1668004095810)
+@@ -1,19 +1,5 @@
+-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+-
+-buildscript {
+-    repositories {
+-        jcenter()
+-    }
+-    dependencies {
+-        classpath 'com.android.tools.build:gradle:2.3.0'
+-
+-        // NOTE: Do not place your application dependencies here; they belong
+-        // in the individual module build.gradle files
+-    }
+-}
+-
+-allprojects {
+-    repositories {
+-        jcenter()
+-    }
+-}
++plugins {
++    id 'com.android.application' version '7.3.1' apply false
++    id 'com.android.library' version '7.3.1' apply false
++    id 'org.jetbrains.kotlin.android' version '1.7.20' apply false
++}
+\ No newline at end of file
+Index: app/build.gradle
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>apply plugin: 'com.android.application'\r\n\r\nandroid {\r\n    compileSdkVersion 25\r\n    buildToolsVersion \"25.0.2\"\r\n    defaultConfig {\r\n        applicationId \"com.drewmahrt.collageapp\"\r\n        minSdkVersion 17\r\n        targetSdkVersion 25\r\n        versionCode 2\r\n        versionName \"1.01\"\r\n    }\r\n    buildTypes {\r\n        release {\r\n            minifyEnabled false\r\n            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'\r\n        }\r\n    }\r\n    productFlavors {\r\n    }\r\n}\r\n\r\nrepositories {\r\n    maven {\r\n        url \"https://jitpack.io\"\r\n    }\r\n}\r\n\r\ndependencies {\r\n    compile fileTree(dir: 'libs', include: ['*.jar'])\r\n    compile 'com.android.support:appcompat-v7:25.3.1'\r\n    compile 'com.android.support:design:25.3.1'\r\n    compile 'com.github.QuadFlask:colorpicker:0.0.9'\r\n    compile 'com.getkeepsafe.taptargetview:taptargetview:1.9.1'\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/build.gradle b/app/build.gradle
+--- a/app/build.gradle	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/app/build.gradle	(date 1668458170350)
+@@ -1,35 +1,54 @@
+ apply plugin: 'com.android.application'
++apply plugin: 'org.jetbrains.kotlin.android'
+ 
+ android {
+-    compileSdkVersion 25
+-    buildToolsVersion "25.0.2"
++    namespace "com.drewmahrt.collageapp"
++    compileSdkVersion 32
++
+     defaultConfig {
+         applicationId "com.drewmahrt.collageapp"
+-        minSdkVersion 17
+-        targetSdkVersion 25
+-        versionCode 2
+-        versionName "1.01"
++        minSdk 29
++        targetSdk 32
++        versionCode 1
++        versionName "1.0"
++
++        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+     }
++
+     buildTypes {
+-        release {
++        debug {
++            debuggable true
+             minifyEnabled false
+-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+         }
++        release {
++            debuggable false
++            minifyEnabled true
++            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
++        }
+     }
+-    productFlavors {
++    compileOptions {
++        sourceCompatibility JavaVersion.VERSION_1_8
++        targetCompatibility JavaVersion.VERSION_1_8
+     }
+-}
+-
+-repositories {
+-    maven {
+-        url "https://jitpack.io"
++    kotlinOptions {
++        jvmTarget = '1.8'
++    }
++    buildFeatures {
++        viewBinding true
+     }
+ }
+ 
+ dependencies {
+-    compile fileTree(dir: 'libs', include: ['*.jar'])
+-    compile 'com.android.support:appcompat-v7:25.3.1'
+-    compile 'com.android.support:design:25.3.1'
+-    compile 'com.github.QuadFlask:colorpicker:0.0.9'
+-    compile 'com.getkeepsafe.taptargetview:taptargetview:1.9.1'
++    implementation 'androidx.core:core-ktx:1.7.0'
++    implementation 'androidx.appcompat:appcompat:1.4.1'
++    implementation 'com.google.android.material:material:1.5.0'
++    implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
++    implementation 'androidx.navigation:navigation-fragment-ktx:2.4.1'
++    implementation 'androidx.navigation:navigation-ui-ktx:2.4.1'
++    implementation files('libs/color_picker.aar')
++    testImplementation 'junit:junit:4.13.2'
++    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
++    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
++//    implementation 'com.github.QuadFlask:colorpicker:0.0.15'
++    implementation 'com.getkeepsafe.taptargetview:taptargetview:1.13.3'
+ }
+Index: gradle/wrapper/gradle-wrapper.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>#Sun Apr 30 14:02:37 EDT 2017\r\ndistributionBase=GRADLE_USER_HOME\r\ndistributionPath=wrapper/dists\r\nzipStoreBase=GRADLE_USER_HOME\r\nzipStorePath=wrapper/dists\r\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-3.3-all.zip\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>ISO-8859-1
+===================================================================
+diff --git a/gradle/wrapper/gradle-wrapper.properties b/gradle/wrapper/gradle-wrapper.properties
+--- a/gradle/wrapper/gradle-wrapper.properties	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/gradle/wrapper/gradle-wrapper.properties	(date 1667944282793)
+@@ -1,6 +1,5 @@
+-#Sun Apr 30 14:02:37 EDT 2017
+ distributionBase=GRADLE_USER_HOME
++distributionUrl=https\://services.gradle.org/distributions/gradle-7.4-bin.zip
+ distributionPath=wrapper/dists
+-zipStoreBase=GRADLE_USER_HOME
+ zipStorePath=wrapper/dists
+-distributionUrl=https\://services.gradle.org/distributions/gradle-3.3-all.zip
++zipStoreBase=GRADLE_USER_HOME
+Index: gradle.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+># Project-wide Gradle settings.\r\n\r\n# IDE (e.g. Android Studio) users:\r\n# Gradle settings configured through the IDE *will override*\r\n# any settings specified in this file.\r\n\r\n# For more details on how to configure your build environment visit\r\n# http://www.gradle.org/docs/current/userguide/build_environment.html\r\n\r\n# Specifies the JVM arguments used for the daemon process.\r\n# The setting is particularly useful for tweaking memory settings.\r\n# Default value: -Xmx10248m -XX:MaxPermSize=256m\r\n# org.gradle.jvmargs=-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\r\n\r\n# When configured, Gradle will run in incubating parallel mode.\r\n# This option should only be used with decoupled projects. More details, visit\r\n# http://www.gradle.org/docs/current/userguide/multi_project_builds.html#sec:decoupled_projects\r\n# org.gradle.parallel=true
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>ISO-8859-1
+===================================================================
+diff --git a/gradle.properties b/gradle.properties
+--- a/gradle.properties	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/gradle.properties	(date 1668003800892)
+@@ -1,18 +1,23 @@
+ # Project-wide Gradle settings.
+-
+ # IDE (e.g. Android Studio) users:
+ # Gradle settings configured through the IDE *will override*
+ # any settings specified in this file.
+-
+ # For more details on how to configure your build environment visit
+ # http://www.gradle.org/docs/current/userguide/build_environment.html
+-
+ # Specifies the JVM arguments used for the daemon process.
+ # The setting is particularly useful for tweaking memory settings.
+-# Default value: -Xmx10248m -XX:MaxPermSize=256m
+-# org.gradle.jvmargs=-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+-
++org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+ # When configured, Gradle will run in incubating parallel mode.
+ # This option should only be used with decoupled projects. More details, visit
+ # http://www.gradle.org/docs/current/userguide/multi_project_builds.html#sec:decoupled_projects
+-# org.gradle.parallel=true
+\ No newline at end of file
++# org.gradle.parallel=true
++# AndroidX package structure to make it clearer which packages are bundled with the
++# Android operating system, and which are packaged with your app's APK
++# https://developer.android.com/topic/libraries/support-library/androidx-rn
++android.useAndroidX=true
++# Kotlin code style for this project: "official" or "obsolete":
++kotlin.code.style=official
++# Enables namespacing of each library's R class so that its R class includes only the
++# resources declared in the library itself and none from the library's dependencies,
++# thereby reducing the size of the R class for that library
++android.nonTransitiveRClass=true
+\ No newline at end of file
+Index: settings.gradle
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>include ':app'\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/settings.gradle b/settings.gradle
+--- a/settings.gradle	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/settings.gradle	(date 1668004272830)
+@@ -1,1 +1,18 @@
++pluginManagement {
++    repositories {
++        gradlePluginPortal()
++        google()
++        jcenter()
++        mavenCentral()
++        maven { url "https://jitpack.io" }
++    }
++}
++dependencyResolutionManagement {
++    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
++    repositories {
++        google()
++        mavenCentral()
++    }
++}
++rootProject.name = "CollageApp"
+ include ':app'
+Index: app/src/main/java/com/drewmahrt/collageapp/CollageCreationActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/drewmahrt/collageapp/CollageCreationActivity.kt b/app/src/main/java/com/drewmahrt/collageapp/CollageCreationActivity.kt
+new file mode 100644
+--- /dev/null	(date 1668459980620)
++++ b/app/src/main/java/com/drewmahrt/collageapp/CollageCreationActivity.kt	(date 1668459980620)
+@@ -0,0 +1,336 @@
++package com.drewmahrt.collageapp
++
++import android.content.ContentValues
++import android.content.Context
++import android.content.pm.PackageManager
++import android.graphics.Bitmap
++import android.graphics.BitmapFactory
++import android.graphics.Canvas
++import android.graphics.Color
++import android.net.Uri
++import android.os.Bundle
++import android.provider.MediaStore
++import android.view.*
++import android.view.ScaleGestureDetector.OnScaleGestureListener
++import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
++import android.view.View.OnFocusChangeListener
++import android.view.View.OnTouchListener
++import android.widget.FrameLayout
++import android.widget.ImageView
++import android.widget.Toast
++import androidx.activity.result.ActivityResultLauncher
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.appcompat.app.AlertDialog
++import androidx.appcompat.app.AppCompatActivity
++import androidx.appcompat.widget.ActionMenuView
++import com.drewmahrt.collageapp.SaveImageUtility.getResizedBitmap
++import com.drewmahrt.collageapp.SaveImageUtility.saveMediaToStorage
++import com.drewmahrt.collageapp.databinding.ActivityCollageCreatorBinding
++import com.flask.colorpicker.ColorPickerView
++import com.flask.colorpicker.builder.ColorPickerDialogBuilder
++import com.getkeepsafe.taptargetview.TapTarget
++import com.getkeepsafe.taptargetview.TapTargetView
++import java.io.FileNotFoundException
++
++class CollageCreationActivity : AppCompatActivity(), OnTouchListener, ActionMenuView.OnMenuItemClickListener,
++    OnFocusChangeListener {
++    private var mScaleDetector: ScaleGestureDetector? = null
++
++    private var isScaling = false
++    private var touchedId = 0
++    private var touchedIndex = 0
++    private var mCollageImages = mutableListOf<CollageImage>()
++    private var mStartX = 0
++    private var mStartY = 0
++
++    private lateinit var binding: ActivityCollageCreatorBinding
++
++    val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
++        // Callback is invoked after the user selects a media item or closes the
++        // photo picker.
++        if (uri != null) {
++            imagePicked(uri)
++        } else {
++
++        }
++    }
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        binding = ActivityCollageCreatorBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++
++        val bottomMenu = binding.actionMenuView.menu
++        menuInflater.inflate(R.menu.collage_menu, bottomMenu)
++        mCollageImages = ArrayList()
++
++        binding.collageContainer.setOnTouchListener(this)
++        isScaling = false
++        touchedId = -1
++        touchedIndex = -1
++
++        //Fix to bring FAB on top for 4.x devices
++        binding.addFab.bringToFront()
++        restoreFullScreen()
++        binding.addFab.setOnClickListener { pickImageLauncher.launch("image/*") }
++        binding.actionMenuView.setOnMenuItemClickListener(this)
++        setupScaleDetector()
++
++        val preferences = getPreferences(MODE_PRIVATE)
++        //If first time launching, show add picture tutorial
++        if (!preferences.getBoolean(ADD_PREFERENCES_KEY, false)) {
++            triggerIntroShowcase(
++                R.id.add_fab,
++                "Tap here to add you first photo!",
++                ADD_PREFERENCES_KEY
++            )
++        }
++    }
++
++    private fun triggerIntroShowcase(id: Int, message: String, preferencesKey: String) {
++        val preferences = getPreferences(MODE_PRIVATE)
++        TapTargetView.showFor(this,
++            TapTarget.forView(findViewById(id), message)
++                .transparentTarget(true)
++                .cancelable(false),
++            object : TapTargetView.Listener() {
++                override fun onTargetClick(view: TapTargetView) {
++                    preferences.edit().putBoolean(preferencesKey, true).apply()
++                    view.dismiss(true)
++                    when (id) {
++                        R.id.add_fab -> pickImageLauncher.launch("image/*")
++                        R.id.pick_color_action -> colorButtonPressed()
++                        R.id.sort_layer_up_action -> bringToFront()
++                    }
++                }
++            }
++        )
++    }
++
++    override fun onResume() {
++        super.onResume()
++        restoreFullScreen()
++    }
++
++    private fun setupScaleDetector() {
++        mScaleDetector = ScaleGestureDetector(this, object : OnScaleGestureListener {
++            override fun onScaleEnd(detector: ScaleGestureDetector) {}
++            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
++                isScaling = true
++                return true
++            }
++
++            override fun onScale(detector: ScaleGestureDetector): Boolean {
++                val image = binding.collageContainer.focusedChild
++                val scale = Math.max(0.95f, Math.min(detector.scaleFactor, 1.1f))
++                val currentImage = mCollageImages[touchedIndex]
++                currentImage.scale = currentImage.scale * scale
++                image.scaleX = currentImage.scale
++                image.scaleY = currentImage.scale
++                return false
++            }
++        })
++        val listener: SimpleOnScaleGestureListener = object : SimpleOnScaleGestureListener() {
++            override fun onScale(detector: ScaleGestureDetector): Boolean {
++                return super.onScale(detector)
++            }
++        }
++    }
++
++    private fun bringToFront() {
++        if (binding.collageContainer.focusedChild != null) {
++            binding.collageContainer.focusedChild.bringToFront()
++        }
++    }
++
++    override fun onCreateOptionsMenu(menu: Menu): Boolean {
++        menuInflater.inflate(R.menu.collage_menu, menu)
++        return super.onCreateOptionsMenu(menu)
++    }
++
++    override fun onTouch(view: View, motionEvent: MotionEvent): Boolean {
++
++        //Check for touching background of canvas which causes ClassCastException for RelativeLayout to FrameLayout
++        if (view.id == R.id.collage_container) return false
++        val layoutParams = view.layoutParams as FrameLayout.LayoutParams
++        if (motionEvent.pointerCount > 1 && touchedId != -1) {
++            mScaleDetector!!.onTouchEvent(motionEvent)
++        } else if (touchedId == view.id || touchedId == -1) {
++            view.requestFocus()
++            view.requestFocusFromTouch()
++            when (motionEvent.action and MotionEvent.ACTION_MASK) {
++                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
++                    touchedId = view.id
++                    touchedIndex = findCollageIndex(touchedId)
++                    mStartX = motionEvent.x.toInt()
++                    mStartY = motionEvent.y.toInt()
++                }
++                MotionEvent.ACTION_MOVE ->                     //only allow moving if all fingers have been removed from a previous scaling action
++                    if (!isScaling) {
++                        val delta_x = motionEvent.x.toInt() - mStartX
++                        val delta_y = motionEvent.y.toInt() - mStartY
++                        layoutParams.leftMargin = layoutParams.leftMargin + delta_x
++                        layoutParams.rightMargin = layoutParams.rightMargin - delta_x
++                        layoutParams.topMargin = layoutParams.topMargin + delta_y
++                        layoutParams.bottomMargin = layoutParams.bottomMargin - delta_y
++                        view.layoutParams = layoutParams
++                    }
++                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
++                    //set scaling flag to false since all fingers have been removed.
++                    isScaling = false
++                    touchedId = -1
++                    touchedIndex = -1
++                }
++            }
++        }
++        binding.collageContainer.invalidate()
++        return true
++    }
++
++    private fun findCollageIndex(touchedId: Int): Int {
++        for (i in mCollageImages.indices) {
++            if (touchedId == mCollageImages[i].id) return i
++        }
++        return -1
++    }
++
++    private fun imagePicked(uri: Uri) {
++        try {
++            val imageUri = uri
++            val imageStream = contentResolver.openInputStream(imageUri)
++            val selectedImage = BitmapFactory.decodeStream(imageStream)
++            val resizedImage = getResizedBitmap(selectedImage, 600)
++            val newImage = ImageView(this)
++            val layoutParams = ViewGroup.LayoutParams(
++                ViewGroup.LayoutParams.WRAP_CONTENT,
++                ViewGroup.LayoutParams.WRAP_CONTENT
++            )
++            newImage.layoutParams = layoutParams
++            newImage.setImageBitmap(resizedImage)
++            newImage.isFocusableInTouchMode = true
++            newImage.isFocusable = true
++            newImage.setOnTouchListener(this)
++            newImage.onFocusChangeListener = this
++            newImage.id = View.generateViewId()
++            newImage.requestFocus()
++            newImage.requestFocusFromTouch()
++            newImage.setOnTouchListener(this)
++            binding.collageContainer.addView(newImage)
++
++            mCollageImages.add(
++                CollageImage(
++                    resizedImage.width.toFloat(),
++                    resizedImage.height.toFloat(), imageUri, newImage.id
++                )
++            )
++
++            //If first time adding a picture, show background color tutorial
++            val preferences = getPreferences(MODE_PRIVATE)
++            if (!preferences.getBoolean(BACKGROUND_PREFERENCES_KEY, false))
++                triggerIntroShowcase(
++                    R.id.pick_color_action,
++                    "Tap here to choose your background color.",
++                    BACKGROUND_PREFERENCES_KEY
++                )
++
++            //If first time with two pictures, show layer button tutorial
++            if (mCollageImages.size > 1 && !preferences.getBoolean(LAYER_PREFERENCES_KEY, false))
++                triggerIntroShowcase(
++                    R.id.sort_layer_up_action,
++                    "Use this button to move the last selected image to the top layer.",
++                    LAYER_PREFERENCES_KEY
++                )
++        } catch (e: FileNotFoundException) {
++            e.printStackTrace()
++        }
++    }
++
++    private fun colorButtonPressed() {
++        ColorPickerDialogBuilder
++            .with(this@CollageCreationActivity)
++            .setTitle("Choose background color")
++            .initialColor(Color.WHITE)
++            .wheelType(ColorPickerView.WHEEL_TYPE.FLOWER)
++            .noSliders()
++            .density(12)
++            .setOnColorSelectedListener { }
++            .setPositiveButton(
++                "ok"
++            ) { dialog, selectedColor, allColors ->
++                binding.collageContainer.setBackgroundColor(selectedColor)
++                dialog.dismiss()
++                binding.collageContainer.invalidate()
++                restoreFullScreen()
++            }
++            .setNegativeButton(
++                "cancel"
++            ) { dialog, which ->
++                dialog.dismiss()
++                restoreFullScreen()
++            }
++            .build()
++            .show()
++    }
++
++    override fun onMenuItemClick(item: MenuItem): Boolean {
++        when (item.itemId) {
++            R.id.sort_layer_up_action -> bringToFront()
++            R.id.delete_image_action -> deleteSelectedImage()
++            R.id.pick_color_action -> colorButtonPressed()
++            R.id.save_action -> saveMediaToStorage(getBitmapForSaving())
++        }
++        return true
++    }
++
++    private fun deleteSelectedImage() {
++        if (binding.collageContainer.focusedChild != null) {
++            binding.collageContainer.removeView(binding.collageContainer.focusedChild)
++        }
++    }
++
++    override fun onFocusChange(v: View, hasFocus: Boolean) {
++        if (hasFocus) {
++            v.setBackgroundResource(R.drawable.selected_border)
++        } else {
++            v.setBackgroundResource(R.drawable.unselected_border)
++        }
++    }
++
++    private fun restoreFullScreen() {
++        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
++                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
++                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
++                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
++                or View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
++                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
++    }
++
++    private fun getBitmapForSaving(): Bitmap {
++        //remove selected image border
++        if (binding.collageContainer.getFocusedChild() != null) {
++            binding.collageContainer.getFocusedChild().setBackgroundResource(R.drawable.unselected_border)
++        }
++
++        binding.collageContainer
++        //Find the view we are after
++        //Create a Bitmap with the same dimensions
++        val bitmap = Bitmap.createBitmap(
++            binding.collageContainer.width,
++            binding.collageContainer.height,
++            Bitmap.Config.RGB_565
++        )
++
++        binding.collageContainer.draw(Canvas(bitmap))
++
++        return bitmap
++    }
++
++    companion object {
++        private const val TAG = "CollageActivity"
++        private const val PICTURE_GALLERY = 1
++        private const val STORAGE_PERMISSION = 0
++        private const val ADD_PREFERENCES_KEY = "add_tutorial"
++        private const val BACKGROUND_PREFERENCES_KEY = "background_tutorial"
++        private const val LAYER_PREFERENCES_KEY = "layer_tutorial"
++    }
++}
+\ No newline at end of file
+Index: CollageApp.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<module external.linked.project.id=\"CollageApp\" external.linked.project.path=\"$MODULE_DIR$\" external.root.project.path=\"$MODULE_DIR$\" external.system.id=\"GRADLE\" external.system.module.group=\"\" external.system.module.version=\"unspecified\" type=\"JAVA_MODULE\" version=\"4\">\r\n  <component name=\"FacetManager\">\r\n    <facet type=\"java-gradle\" name=\"Java-Gradle\">\r\n      <configuration>\r\n        <option name=\"BUILD_FOLDER_PATH\" value=\"$MODULE_DIR$/build\" />\r\n        <option name=\"BUILDABLE\" value=\"false\" />\r\n      </configuration>\r\n    </facet>\r\n  </component>\r\n  <component name=\"NewModuleRootManager\" LANGUAGE_LEVEL=\"JDK_1_7\" inherit-compiler-output=\"true\">\r\n    <exclude-output />\r\n    <content url=\"file://$MODULE_DIR$\">\r\n      <excludeFolder url=\"file://$MODULE_DIR$/.gradle\" />\r\n    </content>\r\n    <orderEntry type=\"inheritedJdk\" />\r\n    <orderEntry type=\"sourceFolder\" forTests=\"false\" />\r\n  </component>\r\n</module>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/CollageApp.iml b/CollageApp.iml
+--- a/CollageApp.iml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/CollageApp.iml	(date 1668003814979)
+@@ -1,17 +1,10 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <module external.linked.project.id="CollageApp" external.linked.project.path="$MODULE_DIR$" external.root.project.path="$MODULE_DIR$" external.system.id="GRADLE" external.system.module.group="" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
+-  <component name="FacetManager">
+-    <facet type="java-gradle" name="Java-Gradle">
+-      <configuration>
+-        <option name="BUILD_FOLDER_PATH" value="$MODULE_DIR$/build" />
+-        <option name="BUILDABLE" value="false" />
+-      </configuration>
+-    </facet>
+-  </component>
+-  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_1_7" inherit-compiler-output="true">
++  <component name="NewModuleRootManager" inherit-compiler-output="true">
+     <exclude-output />
+     <content url="file://$MODULE_DIR$">
+       <excludeFolder url="file://$MODULE_DIR$/.gradle" />
++      <excludeFolder url="file://$MODULE_DIR$/build" />
+     </content>
+     <orderEntry type="inheritedJdk" />
+     <orderEntry type="sourceFolder" forTests="false" />
+Index: app/src/main/java/com/drewmahrt/collageapp/CollageImage.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/drewmahrt/collageapp/CollageImage.kt b/app/src/main/java/com/drewmahrt/collageapp/CollageImage.kt
+new file mode 100644
+--- /dev/null	(date 1668009001123)
++++ b/app/src/main/java/com/drewmahrt/collageapp/CollageImage.kt	(date 1668009001123)
+@@ -0,0 +1,7 @@
++package com.drewmahrt.collageapp
++
++import android.net.Uri
++
++class CollageImage(var width: Float, var height: Float, var imageUri: Uri, var id: Int) {
++    var scale = 1f
++}
+\ No newline at end of file
+Index: app/src/main/java/com/drewmahrt/collageapp/SaveImageUtility.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/drewmahrt/collageapp/SaveImageUtility.kt b/app/src/main/java/com/drewmahrt/collageapp/SaveImageUtility.kt
+new file mode 100644
+--- /dev/null	(date 1668458729485)
++++ b/app/src/main/java/com/drewmahrt/collageapp/SaveImageUtility.kt	(date 1668458729485)
+@@ -0,0 +1,55 @@
++package com.drewmahrt.collageapp
++
++import android.content.ContentValues
++import android.content.Context
++import android.graphics.Bitmap
++import android.net.Uri
++import android.os.Build
++import android.os.Environment
++import android.provider.MediaStore
++import android.widget.Toast
++import java.io.File
++import java.io.FileOutputStream
++import java.io.OutputStream
++
++object SaveImageUtility {
++    fun Context.saveMediaToStorage(bitmap: Bitmap) {
++        val filename = "${System.currentTimeMillis()}.jpg"
++        var fos: OutputStream? = null
++        if (true || Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++            contentResolver?.also { resolver ->
++                val contentValues = ContentValues().apply {
++                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
++                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
++                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
++                }
++                val imageUri: Uri? =
++                    resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
++                fos = imageUri?.let { resolver.openOutputStream(it) }
++            }
++        } else {
++            val imagesDir =
++                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
++            val image = File(imagesDir, filename)
++            fos = FileOutputStream(image)
++        }
++        fos?.use {
++            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it)
++            Toast.makeText(this, "Image saved!", Toast.LENGTH_SHORT).show()
++        }
++    }
++
++    fun getResizedBitmap(image: Bitmap, maxSize: Int): Bitmap {
++        var width = image.width
++        var height = image.height
++        val bitmapRatio = width.toFloat() / height.toFloat()
++        if (bitmapRatio > 1) {
++            width = maxSize
++            height = (width / bitmapRatio).toInt()
++        } else {
++            height = maxSize
++            width = (height * bitmapRatio).toInt()
++        }
++        return Bitmap.createScaledBitmap(image, width, height, true)
++    }
++}
+\ No newline at end of file
+Index: .idea/assetWizardSettings.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/assetWizardSettings.xml b/.idea/assetWizardSettings.xml
+new file mode 100644
+--- /dev/null	(date 1668016119667)
++++ b/.idea/assetWizardSettings.xml	(date 1668016119667)
+@@ -0,0 +1,46 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="WizardSettings">
++    <option name="children">
++      <map>
++        <entry key="vectorWizard">
++          <value>
++            <PersistentState>
++              <option name="children">
++                <map>
++                  <entry key="vectorAssetStep">
++                    <value>
++                      <PersistentState>
++                        <option name="children">
++                          <map>
++                            <entry key="clipartAsset">
++                              <value>
++                                <PersistentState>
++                                  <option name="values">
++                                    <map>
++                                      <entry key="url" value="jar:file:/C:/Program%20Files/Android/Android%20Studio/plugins/android/lib/android.jar!/images/material/icons/materialicons/delete/baseline_delete_24.xml" />
++                                    </map>
++                                  </option>
++                                </PersistentState>
++                              </value>
++                            </entry>
++                          </map>
++                        </option>
++                        <option name="values">
++                          <map>
++                            <entry key="outputName" value="ic_baseline_delete_24" />
++                            <entry key="sourceFile" value="D:\AndroidStudioProjects\Collage-App\CollageApp" />
++                          </map>
++                        </option>
++                      </PersistentState>
++                    </value>
++                  </entry>
++                </map>
++              </option>
++            </PersistentState>
++          </value>
++        </entry>
++      </map>
++    </option>
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/compiler.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"CompilerConfiguration\">\r\n    <resourceExtensions />\r\n    <wildcardResourcePatterns>\r\n      <entry name=\"!?*.java\" />\r\n      <entry name=\"!?*.form\" />\r\n      <entry name=\"!?*.class\" />\r\n      <entry name=\"!?*.groovy\" />\r\n      <entry name=\"!?*.scala\" />\r\n      <entry name=\"!?*.flex\" />\r\n      <entry name=\"!?*.kt\" />\r\n      <entry name=\"!?*.clj\" />\r\n      <entry name=\"!?*.aj\" />\r\n    </wildcardResourcePatterns>\r\n    <annotationProcessing>\r\n      <profile default=\"true\" name=\"Default\" enabled=\"false\">\r\n        <processorPath useClasspath=\"true\" />\r\n      </profile>\r\n    </annotationProcessing>\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/compiler.xml b/.idea/compiler.xml
+--- a/.idea/compiler.xml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/.idea/compiler.xml	(date 1668003706681)
+@@ -1,22 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project version="4">
+   <component name="CompilerConfiguration">
+-    <resourceExtensions />
+-    <wildcardResourcePatterns>
+-      <entry name="!?*.java" />
+-      <entry name="!?*.form" />
+-      <entry name="!?*.class" />
+-      <entry name="!?*.groovy" />
+-      <entry name="!?*.scala" />
+-      <entry name="!?*.flex" />
+-      <entry name="!?*.kt" />
+-      <entry name="!?*.clj" />
+-      <entry name="!?*.aj" />
+-    </wildcardResourcePatterns>
+-    <annotationProcessing>
+-      <profile default="true" name="Default" enabled="false">
+-        <processorPath useClasspath="true" />
+-      </profile>
+-    </annotationProcessing>
++    <bytecodeTargetLevel target="11" />
+   </component>
+ </project>
+\ No newline at end of file
+Index: .idea/modules.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"ProjectModuleManager\">\r\n    <modules>\r\n      <module fileurl=\"file://$PROJECT_DIR$/CollageApp.iml\" filepath=\"$PROJECT_DIR$/CollageApp.iml\" />\r\n      <module fileurl=\"file://$PROJECT_DIR$/app/app.iml\" filepath=\"$PROJECT_DIR$/app/app.iml\" />\r\n    </modules>\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/modules.xml b/.idea/modules.xml
+--- a/.idea/modules.xml	(revision 94b44e2a84ef92874846f13bbf2ce472dbfb8304)
++++ b/.idea/modules.xml	(date 1668003815013)
+@@ -3,7 +3,10 @@
+   <component name="ProjectModuleManager">
+     <modules>
+       <module fileurl="file://$PROJECT_DIR$/CollageApp.iml" filepath="$PROJECT_DIR$/CollageApp.iml" />
+-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
++      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.iml" />
++      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.androidTest.iml" />
++      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.main.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.main.iml" />
++      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/CollageApp.app.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/CollageApp.app.unitTest.iml" />
+     </modules>
+   </component>
+ </project>
+\ No newline at end of file
+Index: .idea/vcs.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+new file mode 100644
+--- /dev/null	(date 1667943773260)
++++ b/.idea/vcs.xml	(date 1667943773260)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="VcsDirectoryMappings">
++    <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
++  </component>
++</project>
+\ No newline at end of file

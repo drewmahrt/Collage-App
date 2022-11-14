@@ -18,37 +18,9 @@
         app:showAsAction="always"
         />
 
-    <!--<item android:id="@+id/sort_layer_down_action"-->
-        <!--android:title="@string/sort_layers_down_action_title"-->
-        <!--android:icon="@drawable/ic_sort_down"-->
-        <!--app:showAsAction="always"-->
-        <!--/>-->
-
     <item android:id="@+id/sort_layer_up_action"
         android:title="@string/sort_layers_up_action_title"
         android:icon="@drawable/ic_sort_up"
         app:showAsAction="always"
         />
-
-    <!--<item android:id="@+id/zoom_out_action"-->
-        <!--android:title="@string/zoom_out_action_title"-->
-        <!--android:icon="@drawable/ic_zoom_out"-->
-        <!--app:showAsAction="always"-->
-        <!--/>-->
-
-    <!--<item android:id="@+id/zoom_in_action"-->
-        <!--android:title="@string/zoom_in_action_title"-->
-        <!--android:icon="@drawable/ic_zoom_in"-->
-        <!--app:showAsAction="always"-->
-        <!--/>-->
-
-    <item android:id="@+id/rotate_left_action"
-          android:title="Rotate Left"
-          android:icon="@drawable/ic_rotate_left_black_24dp"
-          app:showAsAction="always"/>
-
-    <item android:id="@+id/rotate_right_action"
-          android:title="Rotate Right"
-          android:icon="@drawable/ic_rotate_right_black_24dp"
-          app:showAsAction="always"/>
 </menu>
