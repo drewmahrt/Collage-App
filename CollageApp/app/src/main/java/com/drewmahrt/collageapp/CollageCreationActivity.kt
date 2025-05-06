@@ -31,6 +31,8 @@ import com.flask.colorpicker.builder.ColorPickerDialogBuilder
 import com.getkeepsafe.taptargetview.TapTarget
 import com.getkeepsafe.taptargetview.TapTargetView
 import java.io.FileNotFoundException
+import androidx.core.content.edit
+import androidx.core.graphics.createBitmap
 
 class CollageCreationActivity : AppCompatActivity(), OnTouchListener, ActionMenuView.OnMenuItemClickListener,
     OnFocusChangeListener {
@@ -50,8 +52,6 @@ class CollageCreationActivity : AppCompatActivity(), OnTouchListener, ActionMenu
         // photo picker.
         if (uri != null) {
             imagePicked(uri)
-        } else {
-
         }
     }
 
@@ -95,7 +95,7 @@ class CollageCreationActivity : AppCompatActivity(), OnTouchListener, ActionMenu
                 .cancelable(false),
             object : TapTargetView.Listener() {
                 override fun onTargetClick(view: TapTargetView) {
-                    preferences.edit().putBoolean(preferencesKey, true).apply()
+                    preferences.edit { putBoolean(preferencesKey, true) }
                     view.dismiss(true)
                     when (id) {
                         R.id.add_fab -> pickImageLauncher.launch("image/*")
@@ -307,14 +307,14 @@ class CollageCreationActivity : AppCompatActivity(), OnTouchListener, ActionMenu
 
     private fun getBitmapForSaving(): Bitmap {
         //remove selected image border
-        if (binding.collageContainer.getFocusedChild() != null) {
-            binding.collageContainer.getFocusedChild().setBackgroundResource(R.drawable.unselected_border)
+        if (binding.collageContainer.focusedChild != null) {
+            binding.collageContainer.focusedChild.setBackgroundResource(R.drawable.unselected_border)
         }
 
         binding.collageContainer
         //Find the view we are after
         //Create a Bitmap with the same dimensions
-        val bitmap = Bitmap.createBitmap(
+        val bitmap = createBitmap(
             binding.collageContainer.width,
             binding.collageContainer.height,
             Bitmap.Config.RGB_565
